@@ -1309,7 +1309,7 @@ FINAL,Proxy';
 	/** 
 	 * This is a php implementation of autoproxy2pac 
 	 */  
-	function reg_encode($str) {  
+	private static function reg_encode($str) {  
 	  $tmp_str = $str;  
 	  $tmp_str = str_replace('/', "\\/", $tmp_str);  
 	  $tmp_str = str_replace('.', "\\.", $tmp_str);  
@@ -1324,7 +1324,7 @@ FINAL,Proxy';
 	  return $tmp_str;  
 	}  
 	  
-	function get_pac($proxy_type, $proxy_host, $proxy_port, $proxy_google,$defined) {  
+	private static function get_pac($proxy_type, $proxy_host, $proxy_port, $proxy_google,$defined) {  
 	  $rulelist = base64_decode(file_get_contents("https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt"))."\n".$defined;  
 	  $gfwlist = explode("\n", $rulelist);  
 	  if ($proxy_google == "true") {  
