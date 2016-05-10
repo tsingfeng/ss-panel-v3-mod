@@ -79,6 +79,7 @@ class ShopController extends AdminController
 		$shop->name =  $request->getParam('name');
         $shop->price =  $request->getParam('price');
         $shop->auto_renew =  $request->getParam('auto_renew');
+		$shop->status=1;
         
 		$content=array();
 		if($request->getParam('bandwidth')!=0)
@@ -116,11 +117,26 @@ class ShopController extends AdminController
 
 
     public function deleteGet($request, $response, $args){
-        $id = $args['id'];
+        $id = $request->getParam('id');
         $shop = Shop::find($id);
-        $shop->delete();
-        $newResponse = $response->withStatus(302)->withHeader('Location', '/admin/shop');
-        return $newResponse;
+		$shop->status=0;
+        if(!$shop->save()){
+            $rs['ret'] = 0;
+            $rs['msg'] = "下架失败";
+            return $response->getBody()->write(json_encode($rs));
+        }
+		
+		$boughts = Bought::where("shopid",$id)->get();
+		
+		foreach($boughts as $bought)
+		{
+			$bought->renew=0;
+			$bought->save();
+		}
+		
+        $rs['ret'] = 1;
+        $rs['msg'] = "下架成功";
+        return $response->getBody()->write(json_encode($rs));
     }
 	
 	public function bought($request, $response, $args){
@@ -135,11 +151,16 @@ class ShopController extends AdminController
     }
 	
 	public function deleteBoughtGet($request, $response, $args){
-        $id = $args['id'];
+        $id = $request->getParam('id');
         $shop = Bought::find($id);
         $shop->renew=0;
-		$shop->save();
-        $newResponse = $response->withStatus(302)->withHeader('Location', '/admin/bought');
-        return $newResponse;
+		if(!$shop->save()){
+            $rs['ret'] = 0;
+            $rs['msg'] = "退订失败";
+            return $response->getBody()->write(json_encode($rs));
+        }
+        $rs['ret'] = 1;
+        $rs['msg'] = "退订成功";
+		return $response->getBody()->write(json_encode($rs));
     }
 }

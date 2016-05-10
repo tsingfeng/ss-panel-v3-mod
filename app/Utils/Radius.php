@@ -3,6 +3,9 @@
 namespace App\Utils;
 
 use App\Models\User;
+use App\Models\RadiusRadCheck;
+use App\Models\RadiusRadUserGroup;
+use App\Models\RadiusNas;
 use App\Services\Config;
 
 
@@ -16,33 +19,34 @@ Class Radius
     {
         if(Config::get('radius_db_user')!='')
 		{
-			$dsn = "mysql:host=".Config::get('radius_db_host').";dbname=".Config::get('radius_db_database');  
-			$db = new \PDO($dsn, Config::get('radius_db_user'), Config::get('radius_db_password'));
 			$email=$user->email;
 			$email=str_replace("@","",$email);
 			$email=str_replace(".","",$email);
-			$stmt = $db->prepare("SELECT * FROM `radcheck` WHERE `username`=:username");
-			$stmt->execute(array(':username'=>$email));
+
 			
-			if($stmt->rowCount()==0)
+			$exists=RadiusRadCheck::where("username",$email)->first();
+			
+			if($exists==NULL)
 			{
-				$sql = "INSERT INTO `radcheck` ( `username`, `attribute`, `op`, `value`) VALUES ( :username, 'Cleartext-Password', ':=', :passwd);";
-				$stmt = $db->prepare($sql);
-				$stmt->execute(array(':username'=>addslashes($email),':passwd'=>addslashes($pwd)));
+				$newRad=new RadiusRadCheck();
+				$newRad->username=$email;
+				$newRad->attribute="Cleartext-Password";
+				$newRad->op=":=";
+				$newRad->value=$pwd;
+				$newRad->save();
 				
-				$sql = "INSERT INTO `radusergroup` (`username`, `groupname`, `priority`) VALUES (:groupname, 'user', '0');";
-				$stmt = $db->prepare($sql);
-				$stmt->execute(array(':groupname'=>addslashes($email)));
+				$newRad=new RadiusRadUserGroup();
+				$newRad->username=$email;
+				$newRad->groupname="user";
+				$newRad->priority="0";
+				$newRad->save();
 				
-				$sql = "INSERT INTO `userinfo` ( `username`) VALUES ( :username);";
-				$stmt = $db->prepare($sql);
-				$stmt->execute(array(':username'=>addslashes($email)));
 			}
 			else
 			{
-				$sql = "UPDATE `radcheck` SET `value` = :passwd WHERE `radcheck`.`username` = :username; ";
-				$stmt = $db->prepare($sql);
-				$stmt->execute(array(':username'=>addslashes($email),':passwd'=>addslashes($pwd)));
+				$exists->username=$email;
+				$exists->value=$pwd;
+				$exists->save();
 			}
 		}
     }
@@ -52,27 +56,16 @@ Class Radius
 	{
 		if(Config::get('radius_db_user')!='')
 		{
-			$dsn = "mysql:host=".Config::get('radius_db_host').";dbname=".Config::get('radius_db_database');  
-			$db = new \PDO($dsn, Config::get('radius_db_user'), Config::get('radius_db_password'));
-			
 			$email=str_replace("@","",$email);
 			$email=str_replace(".","",$email);
-			$stmt = $db->prepare("SELECT * FROM `radcheck` WHERE `username`=:username");
-			$stmt->execute(array(':username'=>$email));
-		
-			if($stmt->rowCount()>0)
-			{
-				$sql = "DELETE FROM `radcheck` WHERE `radcheck`.`username` = :username ";
-				$stmt = $db->prepare($sql);
-				$stmt->execute(array(':username'=>addslashes($email)));
 
-				$sql = "DELETE FROM `radusergroup` WHERE `radusergroup`.`username` = :username";
-				$stmt = $db->prepare($sql);
-				$stmt->execute(array(':username'=>addslashes($email)));
-				
-				$sql = "DELETE FROM `userinfo` WHERE `userinfo`.`username` = :username";
-				$stmt = $db->prepare($sql);
-				$stmt->execute(array(':username'=>addslashes($email)));
+			
+			$exists=RadiusRadCheck::where("username",$email)->first();
+			
+			if($exists!=NULL)
+			{
+				RadiusRadCheck::where("username",$email)->delete();
+				RadiusRadUserGroup::where("username",$email)->delete();
 			}
 		}
 	}
@@ -81,42 +74,40 @@ Class Radius
 	{
 		if(Config::get('radius_db_user')!='')
 		{
-			$dsn = "mysql:host=".Config::get('radius_db_host').";dbname=".Config::get('radius_db_database');  
-			$db = new \PDO($dsn, Config::get('radius_db_user'), Config::get('radius_db_password')); 
 			$email1=str_replace("@","",$email1);
 			$email1=str_replace(".","",$email1);
 			$email2=str_replace("@","",$email2);
 			$email2=str_replace(".","",$email2);
-			$stmt = $db->prepare("SELECT * FROM `radcheck` WHERE `username`=:username");
-			$stmt->execute(array(':username'=>$email1));
-			if($stmt->rowCount()>0)
+			
+			$exists=RadiusRadCheck::where("username",$email1)->first();
+			
+			if($exists!=NULL)
 			{
-				$sql = "UPDATE `radcheck` SET `username` = :username,`value` = :passwd WHERE `radcheck`.`username` = :username1;";
-				$stmt = $db->prepare($sql);
-				$stmt->execute(array(':username'=>addslashes($email2),':username1'=>addslashes($email1),':passwd'=>$passwd));
+				$exists->username=$email2;
+				$exists->value=$passwd;
+				$exists->save();
 
-				$sql = "UPDATE `radusergroup` SET `username` = :username WHERE `radusergroup`.`username` = :username1;";
-				$stmt = $db->prepare($sql);
-				$stmt->execute(array(':username'=>addslashes($email2),':username1'=>addslashes($email1)));
+				$exists=RadiusRadUserGroup::where("username",$email1)->first();
+				$exists->username=$email2;
+				$exists->save();
 				
-				$sql = "UPDATE `userinfo` SET `username` = :username WHERE `userinfo`.`username` = :username1 ;";
-				$stmt = $db->prepare($sql);
-				$stmt->execute(array(':username'=>addslashes($email2),':username1'=>addslashes($email1)));
 				
 			}
 			else
 			{
-				$sql = "INSERT INTO `radcheck` ( `username`, `attribute`, `op`, `value`) VALUES ( :username, 'Cleartext-Password', ':=', :passwd);";
-				$stmt = $db->prepare($sql);
-				$stmt->execute(array(':username'=>addslashes($email2),':passwd'=>addslashes($passwd)));
+				$newRad=new RadiusRadCheck();
+				$newRad->username=$email2;
+				$newRad->attribute="Cleartext-Password";
+				$newRad->op=":=";
+				$newRad->value=$passwd;
+				$newRad->save();
 				
-				$sql = "INSERT INTO `radusergroup` (`username`, `groupname`, `priority`) VALUES (:groupname, 'user', '0');";
-				$stmt = $db->prepare($sql);
-				$stmt->execute(array(':groupname'=>addslashes($email2)));
+				$newRad=new RadiusRadUserGroup();
+				$newRad->username=$email2;
+				$newRad->groupname="user";
+				$newRad->priority="0";
+				$newRad->save();
 				
-				$sql = "INSERT INTO `userinfo` ( `username`) VALUES ( :username);";
-				$stmt = $db->prepare($sql);
-				$stmt->execute(array(':username'=>addslashes($email2)));
 			}
 		}
 	}
@@ -125,15 +116,16 @@ Class Radius
 	{
 		if(Config::get('radius_db_user')!='')
 		{
-			$dsn = "mysql:host=".Config::get('radius_db_host').";dbname=".Config::get('radius_db_database');  
-			$db = new \PDO($dsn, Config::get('radius_db_user'), Config::get('radius_db_password'));
-			$stmt = $db->prepare("SELECT * FROM `nas` WHERE `shortname`=:shortname");
-			$stmt->execute(array(':shortname'=>$ip));
-			if($stmt->rowCount()==0)
+			$exists=RadiusNas::where("shortname",$ip)->first();
+			if($exists==NULL)
 			{
-				$sql = "INSERT INTO `nas` (`id`, `nasname`, `shortname`, `type`, `ports`, `secret`, `server`, `community`, `description`) VALUES (NULL, :ip, :ip2, 'other', NULL, :secret, NULL, NULL, :name);";
-				$stmt = $db->prepare($sql);
-				$stmt->execute(array(':ip'=>$ip,':ip2'=>$ip,':secret'=>Config::get('radius_secret'),':name'=>$name));
+				$exists=new RadiusNas();
+				$exists->nasname=$ip;
+				$exists->shortname=$ip;
+				$exists->type="other";
+				$exists->secret=Config::get('radius_secret');
+				$exists->description=$ip;
+				$exists->save();
 			}
 		}
 	}
@@ -142,16 +134,7 @@ Class Radius
 	{
 		if(Config::get('radius_db_user')!='')
 		{
-			$dsn = "mysql:host=".Config::get('radius_db_host').";dbname=".Config::get('radius_db_database');  
-			$db = new \PDO($dsn, Config::get('radius_db_user'), Config::get('radius_db_password'));
-			$stmt = $db->prepare("SELECT * FROM `nas` WHERE `shortname`=:shortname");
-			$stmt->execute(array(':shortname'=>$ip));
-			if($stmt->rowCount()>0)
-			{
-				$sql = "DELETE FROM `nas` WHERE `shortname` = :ip";
-				$stmt = $db->prepare($sql);
-				$stmt->execute(array(':ip'=>$ip));
-			}
+			RadiusNas::where("shortname",$ip)->delete();
 		}
 	}
 	

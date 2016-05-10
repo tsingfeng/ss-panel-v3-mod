@@ -335,7 +335,7 @@ class UserController extends BaseController
         $user = Auth::getUser();
         $nodes = Node::where(
 			function ($query) {
-				$query->where("node_group","=",$this->user->node_group)
+				$query->Where("node_group","=",$this->user->node_group)
 					->orWhere("node_group","=",0);
 			}
 		)->where('type', 1)->where("node_class","<=",$this->user->class)->orderBy('name')->get();
@@ -400,7 +400,7 @@ class UserController extends BaseController
 				continue;
 			}
 			
-			if($user->class>=$node->node_class&&($user->node_group==$node->node_group||$user->node_group==0))
+			if($user->class>=$node->node_class&&($user->node_group==$node->node_group||$node->node_group==0))
 			{
 				$temp=explode(" - ",$node->name);
 				if(!isset($node_prefix[$temp[0]]))
@@ -484,7 +484,7 @@ class UserController extends BaseController
 					
 					if(($node->id==Config::get('cloudxns_ping_nodeid')||$node->id==Config::get('cloudxns_speed_nodeid'))&&Config::get('cloudxns_apikey')!="")
 					{
-						$smt=Smartline::where("node_class",$this->user->class)->where("node_group","=",$this->user->node_group)->orWhere("node_group","=",0)->where("type",($node->id==Config::get('cloudxns_ping_nodeid')?1:0))->first();
+						$smt=Smartline::where("node_class",$this->user->class)->where("node_group","=",$this->user->node_group)->where("type",($node->id==Config::get('cloudxns_ping_nodeid')?1:0))->first();
 						$ary['server']=$smt->domain_prefix.".".Config::get("cloudxns_prefix").".".Config::get("cloudxns_domain");
 					}
 					
@@ -506,7 +506,7 @@ class UserController extends BaseController
 					$surge_proxy = "#!PROXY-OVERRIDE:ProxyBase.conf\n";
 					$surge_proxy .= "[Proxy]\n";
 					$surge_proxy .= "Proxy = custom," . $ary['server'] . "," . $ary['server_port'] . "," . $ary['method'] . "," . $ary['password'] . "," . Config::get('baseUrl') . "/downloads/SSEncrypt.module";
-					return $this->view()->assign('ary', $ary)->assign('json', $json)->assign('link1',Config::get('baseUrl')."/link/".$token_1)->assign('link2',Config::get('baseUrl')."/link/".$token_2)->assign('global_url',Config::get('baseUrl')."/downloads")->assign('json_show', $json_show)->assign('ssqr', $ssqr)->assign('surge_base', $surge_base)->assign('surge_proxy', $surge_proxy)->assign('info_server', $ary['server'])->assign('info_port', $this->user->port)->assign('info_method', $ary['method'])->assign('info_pass', $this->user->passwd)->display('user/nodeinfo.tpl');
+					return $this->view()->assign('ary', $ary)->assign('json', $json)->assign('link1',Config::get('baseUrl')."/link/".$token_1)->assign('link2',Config::get('baseUrl')."/link/".$token_2)->assign('json_show', $json_show)->assign('ssqr', $ssqr)->assign('surge_base', $surge_base)->assign('surge_proxy', $surge_proxy)->assign('info_server', $ary['server'])->assign('info_port', $this->user->port)->assign('info_method', $ary['method'])->assign('info_pass', $this->user->passwd)->display('user/nodeinfo.tpl');
 				}
 			break; 
 
@@ -800,7 +800,7 @@ class UserController extends BaseController
         if (isset($request->getQueryParams()["page"])) {
             $pageNum = $request->getQueryParams()["page"];
         }
-		$shops = Shop::paginate(15, ['*'], 'page', $pageNum);
+		$shops = Shop::where("status",1)->paginate(15, ['*'], 'page', $pageNum);
 		$shops->setPath('/user/shop');
 		
         return $this->view()->assign('shops',$shops)->display('user/shop.tpl');
@@ -811,7 +811,7 @@ class UserController extends BaseController
         $coupon = $request->getParam('coupon');
         $shop = $request->getParam('shop');
 		
-		$shop=Shop::where("id",$shop)->first();
+		$shop=Shop::where("id",$shop)->where("status",1)->first();
 		
 		if($shop==null)
 		{
@@ -861,7 +861,7 @@ class UserController extends BaseController
 		
 		$autorenew = $request->getParam('autorenew');
 		
-		$shop=Shop::where("id",$shop)->first();
+		$shop=Shop::where("id",$shop)->where("status",1)->first();
 		
 		if($shop==null)
 		{
@@ -957,15 +957,29 @@ class UserController extends BaseController
     }
 	
 	public function deleteBoughtGet($request, $response, $args){
-        $id = $args['id'];
-        $shop = Bought::find($id);
+        $id = $request->getParam('id');
+        $shop = Bought::where("id",$id)->where("userid",$this->user->id)->get;
+		
+		if($shop==null)
+		{
+			$rs['ret'] = 0;
+            $rs['msg'] = "退订失败";
+            return $response->getBody()->write(json_encode($rs));
+		}
+		
 		if($this->user->id==$shop->userid)
 		{
 			$shop->renew=0;
-			$shop->save();
 		}
-        $newResponse = $response->withStatus(302)->withHeader('Location', '/user/bought');
-        return $newResponse;
+		
+        if(!$shop->save()){
+            $rs['ret'] = 0;
+            $rs['msg'] = "退订失败";
+            return $response->getBody()->write(json_encode($rs));
+        }
+        $rs['ret'] = 1;
+        $rs['msg'] = "退订成功";
+		return $response->getBody()->write(json_encode($rs));
     }
 	
 	
@@ -988,6 +1002,15 @@ class UserController extends BaseController
 	public function ticket_add($request, $response, $args){
         $title = $request->getParam('title');
 		$content = $request->getParam('content');
+		
+		
+		if(strpos("admin",$content)!=-1||strpos("user",$content)!=-1)
+		{
+			$res['ret'] = 0;
+			$res['msg'] = "请求中有不正当的词语。";
+			return $this->echoJson($response, $res);
+		}
+		
 		
 		if($title==""||$content=="")
 		{
