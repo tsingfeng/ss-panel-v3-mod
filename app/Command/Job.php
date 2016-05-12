@@ -10,6 +10,10 @@ use App\Models\Smartline;
 use App\Models\Shop;
 use App\Models\Bought;
 use App\Models\Coupon;
+use App\Models\Ip;
+use App\Models\NodeInfoLog;
+use App\Models\NodeOnlineLog;
+use App\Models\TrafficLog;
 use App\Services\Config;
 use App\Utils\Radius;
 use App\Utils\Tools;
@@ -86,6 +90,17 @@ class Job
 			}
 		}
 		
+		
+		if(date("d")==14)
+		{
+			Ip::truncate();
+			NodeInfoLog::truncate();
+			NodeOnlineLog::truncate();
+			TrafficLog::truncate();
+		}
+		
+		
+		
 		#https://github.com/shuax/QQWryUpdate/blob/master/update.php
 		
 		$copywrite = file_get_contents("http://update.cz88.net/ip/copywrite.rar");
@@ -113,6 +128,40 @@ class Job
 			{
 				fwrite($fp, $qqwry);
 				fclose($fp);
+			}
+			
+			
+		}
+		
+		for($i=0;$i<5;$i++)
+		{
+			$iplocation = new QQWry(); 
+			$location=$iplocation->getlocation("8.8.8.8");
+			$Userlocation = $location['country'];
+			if(iconv('gbk', 'utf-8//IGNORE', $Userlocation)!="美国")
+			{
+				file_put_contents(BASE_PATH."/storage/qqwry.md5",$newmd5);
+				$qqwry = file_get_contents("http://update.cz88.net/ip/qqwry.rar");
+				$key = unpack("V6", $copywrite)[6];
+				for($i=0; $i<0x200; $i++)
+				{
+					$key *= 0x805;
+					$key ++;
+					$key = $key & 0xFF;
+					$qqwry[$i] = chr( ord($qqwry[$i]) ^ $key );
+				}
+				$qqwry = gzuncompress($qqwry);
+				$fp = fopen(BASE_PATH."/app/Utils/qqwry.dat", "wb");
+				if($fp)
+				{
+					fwrite($fp, $qqwry);
+					fclose($fp);
+				}
+		
+			}
+			else
+			{
+				break;
 			}
 		}
 		
@@ -720,7 +769,7 @@ class Job
 			}
 		}
 		
-		//登陆地检测
+		//登录地检测
 		if(Config::get("login_warn")=="true")
 		{
 			$iplocation = new QQWry(); 
@@ -752,7 +801,7 @@ class Job
 								echo "Send warn mail to user: ".$user->id."-".iconv('gbk', 'utf-8//IGNORE', $Userlocation)."-".iconv('gbk', 'utf-8//IGNORE', $location['country']);
 								$subject = Config::get('appName')."-系统警告";
 								$to = $user->email;
-								$text = "您好，系统发现您的账号在 ".iconv('gbk', 'utf-8//IGNORE', $Userlocation)." 有异常登录，请您自己自行核实登陆行为。有异常请及时修改密码。" ;
+								$text = "您好，系统发现您的账号在 ".iconv('gbk', 'utf-8//IGNORE', $Userlocation)." 有异常登录，请您自己自行核实登录行为。有异常请及时修改密码。" ;
 								try {
 									Mail::send($to, $subject, 'news/warn.tpl', [
 										"user" => $user,"text" => $text

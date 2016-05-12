@@ -39,7 +39,7 @@
 								</div>
 								
 								<div class="form-group form-group-label">
-									<label class="floating-label" for="uid">邀请码类别(0为公开，其他数字为对应用户的UID)</label>
+									<label class="floating-label" for="uid">邀请码类别(0为公开，其他数字为对应用户的UI，或者输入用户的完整邮箱)</label>
 									<input class="form-control" id="uid" type="text">
 								</div>
 								
@@ -49,12 +49,11 @@
 								</div>
 								
 								
-								<div class="form-group">
-									<div class="row">
-										<div class="col-md-10 col-md-push-1">
-											<button id="invite" type="submit" class="btn btn-block btn-brand waves-attach waves-light">生成</button>
-										</div>
-									</div>
+							</div>
+							
+							<div class="card-action">
+								<div class="card-action-btn pull-left">
+									<a class="btn btn-flat waves-attach" id="invite" ><span class="icon">check</span>&nbsp;生成</a>
 								</div>
 							</div>
 						</div>
@@ -122,8 +121,7 @@
 
 
 <script>
-    $(document).ready(function () {
-        $("#invite").click(function () {
+    $("#invite").click(function () {
             $.ajax({
                 type: "POST",
                 url: "/admin/invite",
@@ -146,6 +144,5 @@
                 }
             })
         })
-    })
 </script>
 
