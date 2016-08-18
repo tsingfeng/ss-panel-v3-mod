@@ -15,7 +15,7 @@
 			</div>
 		</div>
 		<div class="container">
-			<div class="col-lg-12 col-lg-push-0 col-sm-10 col-sm-push-1">
+			<div class="col-lg-12 col-sm-12">
 				<section class="content-inner margin-top-no">
 					
 					<div class="card">
@@ -40,15 +40,17 @@
 								<th>节点名称</th>
 							</tr>
 							{foreach $logs as $log}
-								<tr>
-									<td>#{$log->id}</td>
-									<td>{$log->userid}</td>
-									<td>{$log->user()->user_name}</td>
-									<td>{$log->ip}</td>
-									<td>{$loc[$log->ip]}</td>
-									<td>{$log->nodeid}</td>
-									<td>{$log->node()->name}</td>
-								</tr>
+								{if $log->user() != NULL && $log->node() != NULL}
+									<tr>
+										<td>#{$log->id}</td>
+										<td>{$log->userid}</td>
+										<td>{$log->user()->user_name}</td>
+										<td>{$log->ip}</td>
+										<td>{$loc[$log->ip()]}</td>
+										<td>{$log->nodeid}</td>
+										<td>{$log->node()->name}</td>
+									</tr>
+								{/if}
 							{/foreach}
 						</table>
                         {$logs->render()}

@@ -16,12 +16,36 @@ class Ip extends Model
 	
 	public function user()
     {
-        return User::find($this->attributes['userid']);
+        $user = User::where("id",$this->attributes['userid'])->first();
+		if($user == NULL)
+		{
+			Ip::where('id','=',$this->attributes['id'])->delete();
+			return null;
+		}
+        else
+		{
+			return $user;
+		}
     }
 
 	public function Node()
     {
-        return Node::find($this->attributes['nodeid']);
+		$node = Node::where("id",$this->attributes['nodeid'])->first();
+		if($node == NULL)
+		{
+			Ip::where('id','=',$this->attributes['id'])->delete();
+			return null;
+		}
+        else
+		{
+			return $node;
+		}
+    }
+	
+	
+	public function ip()
+    {
+        return str_replace("::ffff:","",$this->attributes['ip']);
     }
 
 

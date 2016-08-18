@@ -13,7 +13,7 @@
 			</div>
 		</div>
 		<div class="container">
-			<div class="col-lg-12 col-lg-push-0 col-sm-10 col-sm-push-1">
+			<div class="col-lg-12 col-sm-12">
 				<section class="content-inner margin-top-no">
 					
 					<div class="card">
@@ -79,7 +79,11 @@
 								
                                 <td>{$user->email}</td>
                                 <td>{$user->port}</td>
-                                <td>{$user->enable}</td>
+								{if $user->enable==1}
+                                <td>可用</td>
+								{else}
+								<td>禁用</td>
+								{/if}
                                 <td>{$user->method}</td>
                                 <td>{$user->usedTraffic()}/{$user->enableTraffic()}</td>
 								<td>{(($user->u+$user->d)-$user->last_day_t)/1024/1024}MB</td>
@@ -99,7 +103,14 @@
 								Google+
 								{/if}
 								
-								{$user->im_value}</th>
+								{if $user->im_type==4}
+								Telegram
+								{/if}
+								{if $user->im_type==4}
+								<a href="https://telegram.me/{$user->im_value}">{$user->im_value}</a>
+								{else}
+								{$user->im_value}
+								{/if}</th>
 								<th>{$user->reg_date}<br>{$user->reg_ip}　{$regloc[$user->id]}</th>
                                 <th>{$user->ref_by}</th>
                                 
@@ -163,8 +174,8 @@ $(document).ready(function(){
 			success:function(data){
 				if(data.ret){
 					$("#result").modal();
-					$("#msg").html(data.msg+"  五秒后跳转。");
-					window.setTimeout("location.href=window.location.href", 5000);
+					$("#msg").html(data.msg);
+					window.setTimeout("location.href=window.location.href", {$config['jump_delay']});
 				}else{
 					$("#result").modal();
 					$("#msg").html(data.msg);

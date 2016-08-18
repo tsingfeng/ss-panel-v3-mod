@@ -13,12 +13,14 @@ use Psr\Http\Message\ResponseInterface;
 
 use App\Utils\Hash,App\Utils\Da;
 use App\Services\Auth;
+use App\Services\Mail;
 use App\Models\User;
 use App\Models\LoginIp;
+use App\Models\EmailVerify;
 use App\Utils\Duoshuo;
 use App\Utils\GA;
 use App\Utils\Wecenter;
-
+use App\Utils\Geetest;
 
 
 
@@ -31,7 +33,16 @@ class AuthController extends BaseController
 
     public function login()
     {
-        return $this->view()->display('auth/login.tpl');
+		$uid = time().rand(1,10000) ;
+		if(Config::get('enable_geetest_login') == 'true')
+		{
+			$GtSdk = Geetest::get($uid);
+		}
+		else
+		{
+			$GtSdk = null;
+		}
+        return $this->view()->assign('geetest_html',$GtSdk)->display('auth/login.tpl');
     }
 
     public function loginHandle($request, $response, $args)
@@ -42,6 +53,16 @@ class AuthController extends BaseController
         $passwd = $request->getParam('passwd');
 		$code = $request->getParam('code');
         $rememberMe = $request->getParam('remember_me');
+		
+		if(Config::get('enable_geetest_login') == 'true')
+		{
+			$ret = Geetest::verify($request->getParam('geetest_challenge'),$request->getParam('geetest_validate'),$request->getParam('geetest_seccode'));
+			if (!$ret) {
+				$res['ret'] = 0;
+				$res['msg'] = "系统无法接受您的验证结果，请刷新页面后重试。";
+				return $response->getBody()->write(json_encode($res));
+			}
+		}
 
         // Handle Login
         $user = User::where('email','=',$email)->first();
@@ -84,12 +105,9 @@ class AuthController extends BaseController
 			}
 		}
 		
-		
         Auth::login($user->id,$time);
         $rs['ret'] = 1;
         $rs['msg'] = "欢迎回来";
-		
-		
 		
 		$loginip=new LoginIp();
 		$loginip->ip=$_SERVER["REMOTE_ADDR"];
@@ -111,7 +129,95 @@ class AuthController extends BaseController
         if(isset($ary['code'])){
             $code = $ary['code'];
         }
-        return $this->view()->assign('code',$code)->display('auth/register.tpl');
+		
+		$uid = time().rand(1,10000) ;
+		
+		if(Config::get('enable_geetest_reg') == 'true')
+		{
+			$GtSdk = Geetest::get($uid);
+		}
+		else
+		{
+			$GtSdk = null;
+		}
+		
+		
+		
+        return $this->view()->assign('enable_invite_code',Config::get('enable_invite_code'))->assign('geetest_html',$GtSdk)->assign('enable_email_verify',Config::get('enable_email_verify'))->assign('code',$code)->display('auth/register.tpl');
+    }
+	
+	
+	public function sendVerify($request, $response, $next)
+    {
+        if(Config::get('enable_email_verify')=='true')
+		{
+			$email = $request->getParam('email');
+			
+			if($email=="")
+			{
+				$res['ret'] = 0;
+				$res['msg'] = "哦？你填了你的邮箱了吗？";
+				return $response->getBody()->write(json_encode($res));
+			}
+			
+			// check email format
+			if(!Check::isEmailLegal($email)){
+				$res['ret'] = 0;
+				$res['msg'] = "邮箱无效";
+				return $response->getBody()->write(json_encode($res));
+			}
+			
+			
+			$user = User::where('email','=',$email)->first();
+			if($user!=null)
+			{
+				$res['ret'] = 0;
+				$res['msg'] = "此邮箱已经注册";
+				return $response->getBody()->write(json_encode($res));
+			}
+			
+			$ipcount = EmailVerify::where('ip','=',$_SERVER["REMOTE_ADDR"])->where('expire_in','>',time())->count();
+			if($ipcount>=(int)Config::get('email_verify_iplimit'))
+			{
+				$res['ret'] = 0;
+				$res['msg'] = "此IP请求次数过多";
+				return $response->getBody()->write(json_encode($res));
+			}
+			
+			
+			$mailcount = EmailVerify::where('email','=',$email)->where('expire_in','>',time())->count();
+			if($mailcount>=3)
+			{
+				$res['ret'] = 0;
+				$res['msg'] = "此邮箱请求次数过多";
+				return $response->getBody()->write(json_encode($res));
+			}
+			
+			$code = Tools::genRandomChar(6);
+			
+			$ev = new EmailVerify();
+			$ev->expire_in = time() + Config::get('email_verify_ttl');
+			$ev->ip = $_SERVER["REMOTE_ADDR"];
+			$ev->email = $email;
+			$ev->code = $code;
+			$ev->save();
+			
+			$subject = Config::get('appName')."- 验证邮件";
+			
+			try {
+				Mail::send($email, $subject, 'auth/verify.tpl', [
+					"code" => $code,"expire" => date("Y-m-d H:i:s",time() + Config::get('email_verify_ttl'))
+				], [
+					//BASE_PATH.'/public/assets/email/styles.css'
+				]);
+			} catch (Exception $e) {
+				return false;
+			}
+			
+			$res['ret'] = 1;
+			$res['msg'] = "验证码发送成功，请查收邮件。";
+			return $response->getBody()->write(json_encode($res));
+		}
     }
 
     public function registerHandle($request, $response, $next)
@@ -123,14 +229,29 @@ class AuthController extends BaseController
         $repasswd = $request->getParam('repasswd');
         $code = $request->getParam('code');
 		$imtype = $request->getParam('imtype');
+		$emailcode = $request->getParam('emailcode');
 		$wechat = $request->getParam('wechat');
         // check code
-        $c = InviteCode::where('code',$code)->first();
-        if ( $c == null) {
-            $res['ret'] = 0;
-            $res['msg'] = "邀请码无效";
-            return $response->getBody()->write(json_encode($res));
-        }
+		
+		if(Config::get('enable_geetest_reg') == 'true')
+		{
+			$ret = Geetest::verify($request->getParam('geetest_challenge'),$request->getParam('geetest_validate'),$request->getParam('geetest_seccode'));
+			if (!$ret) {
+				$res['ret'] = 0;
+				$res['msg'] = "系统无法接受您的验证结果，请刷新页面后重试。";
+				return $response->getBody()->write(json_encode($res));
+			}
+		}
+		
+		if(Config::get('enable_invite_code')=='true')
+		{
+			$c = InviteCode::where('code',$code)->first();
+			if ( $c == null) {
+				$res['ret'] = 0;
+				$res['msg'] = "邀请码无效";
+				return $response->getBody()->write(json_encode($res));
+			}
+		}
 
         // check email format
         if(!Check::isEmailLegal($email)){
@@ -138,6 +259,19 @@ class AuthController extends BaseController
             $res['msg'] = "邮箱无效";
             return $response->getBody()->write(json_encode($res));
         }
+		
+		if(Config::get('enable_email_verify')=='true')
+		{
+			$mailcount = EmailVerify::where('email','=',$email)->where('code','=',$emailcode)->where('expire_in','>',time())->first();
+			if($mailcount == null)
+			{
+				$res['ret'] = 0;
+				$res['msg'] = "您的邮箱验证码不正确";
+				return $response->getBody()->write(json_encode($res));
+			}
+			EmailVerify::where('email','=',$email)->delete();
+		}
+		
         // check pwd length
         if(strlen($passwd)<8){
             $res['ret'] = 0;
@@ -188,11 +322,25 @@ class AuthController extends BaseController
         $user->t = 0;
         $user->u = 0;
         $user->d = 0;
+		$user->method = Config::get('reg_method');
+		$user->protocol = Config::get('reg_protocol');
+		$user->protocol_param = Config::get('reg_protocol_param');
+		$user->obfs = Config::get('reg_obfs');
+		$user->obfs_param = Config::get('reg_obfs_param');
 		$user->im_type =  $imtype;
 		$user->im_value =  $antiXss->xss_clean($wechat);
         $user->transfer_enable = Tools::toGB(Config::get('defaultTraffic'));
         $user->invite_num = Config::get('inviteNum');
-        $user->ref_by = $c->user_id;
+        $user->auto_reset_day = Config::get('reg_auto_reset_day');
+        $user->auto_reset_bandwidth = Config::get('reg_auto_reset_bandwidth');
+		if(Config::get('enable_invite_code')=='true')
+		{
+			$user->ref_by = $c->user_id;
+		}
+		else
+		{
+			$user->ref_by = 0;
+		}
 		$user->expire_in=date("Y-m-d H:i:s",time()+Config::get('user_expire_in_default')*86400);
 		$user->reg_date=date("Y-m-d H:i:s");
 		$user->reg_ip=$_SERVER["REMOTE_ADDR"];
@@ -220,15 +368,14 @@ class AuthController extends BaseController
 
 			Duoshuo::add($user);
 		
-			Da::add($email);
 			
 			Radius::Add($user,$user->passwd);
-		
-
-
-
-
-            $c->delete();
+			
+			if(Config::get('enable_invite_code')=='true')
+			{
+				$c->delete();
+			}
+			
             return $response->getBody()->write(json_encode($res));
         }
         $res['ret'] = 0;

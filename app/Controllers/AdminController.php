@@ -18,7 +18,7 @@ class AdminController extends UserController
         return $this->view()->assign('sts', $sts)->display('admin/index.tpl');
     }
 
-    public function node()
+    public function node($request, $response, $args)
     {
         $nodes = Node::all();
         return $this->view()->assign('nodes', $nodes)->display('admin/node.tpl');
@@ -46,9 +46,24 @@ class AdminController extends UserController
     {
         $n = $request->getParam('num');
         $prefix = $request->getParam('prefix');
-		if($request->getParam('uid')!=0)
+		
+		if($request->getParam('uid')!="0")
 		{
-			$user=User::where("email","=",$request->getParam('uid'))->orWhere("id","=",$request->getParam('uid'))->first();
+			if(strpos($request->getParam('uid'),"@")!=FALSE)
+			{
+				$user=User::where("email","=",$request->getParam('uid'))->first();
+			}
+			else
+			{
+				$user=User::Where("id","=",$request->getParam('uid'))->first();
+			}
+			
+			if($user==null)
+			{
+				$res['ret'] = 0;
+				$res['msg'] = "输入不正确";
+				return $response->getBody()->write(json_encode($res));
+			}
 			$uid = $user->id;
         }
 		else

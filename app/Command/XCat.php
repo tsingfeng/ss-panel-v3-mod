@@ -30,6 +30,8 @@ class XCat
                 return $this->createAdmin();
             case("resetTraffic"):
                 return $this->resetTraffic();
+			case("setTelegram"):
+                return $this->setTelegram();
             case("sendDiaryMail"):
                 return DailyMail::sendDailyMail();
 			case("reall"):
@@ -58,6 +60,8 @@ class XCat
 				return Job::SyncDuoshuo();
 			case("userga"):
 				return Job::UserGa();
+			case("backup"):
+				return Job::backup();
             default:
                 return $this->defaultAction();
         }
@@ -141,5 +145,11 @@ class XCat
              return false;
         }
         return "reset traffic successful";
+    }
+	
+	
+	public function setTelegram(){
+        $bot = new \TelegramBot\Api\BotApi(Config::get('telegram_token'));
+		echo $bot->setWebhook(Config::get('baseUrl')."/telegram_callback");
     }
 }

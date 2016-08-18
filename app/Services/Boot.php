@@ -33,15 +33,16 @@ class Boot
         // Init Eloquent ORM Connection
         $capsule = new Capsule;
         $capsule->addConnection(Config::getDbConfig(),'default');
-		if(Config::get('radius_db_user')!='')
+		if(Config::get('enable_radius')=='true')
 		{
 			$capsule->addConnection(Config::getRadiusDbConfig(),'radius');
 		}
 		
-		if(Config::get('wecenter_db_user')!='')
+		if(Config::get('enable_wecenter')=='true')
 		{
-			$capsule->addConnection(Config::getWecenterDbConfig(),'wencenter');
+			$capsule->addConnection(Config::getWecenterDbConfig(),'wecenter');
 		}
         $capsule->bootEloquent();
+		
     }
 }

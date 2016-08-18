@@ -16,7 +16,7 @@
 			</div>
 		</div>
 		<div class="container">
-			<div class="col-lg-12 col-lg-push-0 col-sm-10 col-sm-push-1">
+			<div class="col-lg-12 col-sm-12">
 				<section class="content-inner margin-top-no">
 					
 					<div class="card">
@@ -51,7 +51,45 @@
 								<td>{$node->node_ip}</td>
                                 <td>{$node->method}</td>
                                 <td>{$node->info}</td>
-                                <td>{$node->sort}</td>
+								{if $node->sort==0}
+                                <td>Shadowsocks</td>
+								{/if}
+								
+                                {if $node->sort==1}
+                                <td>VPN/Radius基础</td>
+								{/if}
+								
+                                {if $node->sort==2}
+                                <td>SSH</td>
+								{/if}
+								
+                                {if $node->sort==3}
+                                <td>PAC</td>
+								{/if}
+								
+                                {if $node->sort==4}
+                                <td>APN文件外链</td>
+								{/if}
+								
+                                {if $node->sort==5}
+                                <td>Anyconnect</td>
+								{/if}
+								
+                                {if $node->sort==6}
+                                <td>APN</td>
+								{/if}
+								
+                                {if $node->sort==7}
+                                <td>PAC PLUS(Socks 代理生成 PAC文件)</td>
+								{/if} 
+								
+								{if $node->sort==8}
+                                <td>PAC PLUS PLUS(HTTPS 代理生成 PAC文件)</td>
+								{/if}
+								
+								{if $node->sort==999}
+                                <td>系统保留，请勿删除</td>
+								{/if}
                                 
                             </tr>
                             {/foreach}
@@ -122,8 +160,8 @@ $(document).ready(function(){
 			success:function(data){
 				if(data.ret){
 					$("#result").modal();
-					$("#msg").html(data.msg+"  五秒后跳转。");
-					window.setTimeout("location.href=window.location.href", 5000);
+					$("#msg").html(data.msg);
+					window.setTimeout("location.href=window.location.href", {$config['jump_delay']});
 				}else{
 					$("#result").modal();
 					$("#msg").html(data.msg);

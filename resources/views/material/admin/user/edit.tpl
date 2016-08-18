@@ -15,7 +15,7 @@
 			</div>
 		</div>
 		<div class="container">
-			<div class="col-lg-12 col-lg-push-0 col-sm-10 col-sm-push-1">
+			<div class="col-lg-12 col-sm-12">
 				<section class="content-inner margin-top-no">
 					
 					<div class="card">
@@ -74,6 +74,28 @@
 									<label class="floating-label" for="method">自定义加密</label>
 									<input class="form-control" id="method" type="text" value="{$user->method}">
 								</div>
+								
+								{if $config['enable_rss']=='true'}
+								<div class="form-group form-group-label">
+									<label class="floating-label" for="protocol">自定义协议</label>
+									<input class="form-control" id="protocol" type="text" value="{$user->protocol}">
+								</div>
+								
+								<div class="form-group form-group-label">
+									<label class="floating-label" for="protocol_param">自定义协议参数</label>
+									<input class="form-control" id="protocol_param" type="text" value="{$user->protocol_param}">
+								</div>
+								
+								<div class="form-group form-group-label">
+									<label class="floating-label" for="obfs">自定义混淆方式</label>
+									<input class="form-control" id="obfs" type="text" value="{$user->obfs}">
+								</div>
+								
+								<div class="form-group form-group-label">
+									<label class="floating-label" for="obfs_param">自定义混淆参数</label>
+									<input class="form-control" id="obfs_param" type="text" value="{$user->obfs_param}">
+								</div>
+								{/if}
 							</div>
 						</div>
 					</div>	
@@ -83,17 +105,33 @@
 						<div class="card-main">
 							<div class="card-inner">
 								<div class="form-group form-group-label">
-									<label class="floating-label" for="transfer_enable">总流量（B）</label>
-									<input class="form-control" id="transfer_enable" type="text" value="{$user->transfer_enable}">
+									<label class="floating-label" for="transfer_enable">总流量（GB）</label>
+									<input class="form-control" id="transfer_enable" type="text" value="{$user->enableTrafficInGB()}">
 								</div>
 								
 								<div class="form-group form-group-label">
-									<label class="floating-label" for="usedTraffic">已用流量（B）</label>
-									<input class="form-control" id="usedTraffic" type="text" value="{$user->u+$user->d}" readonly>
+									<label class="floating-label" for="usedTraffic">已用流量</label>
+									<input class="form-control" id="usedTraffic" type="text" value="{$user->usedTraffic()}" readonly>
 								</div>
 							</div>
 						</div>
 					</div>	
+					
+					<div class="card">
+						<div class="card-main">
+							<div class="card-inner">
+								<div class="form-group form-group-label">
+									<label class="floating-label" for="auto_reset_day">自动重置流量日</label>
+									<input class="form-control" id="auto_reset_day" type="number" value="{$user->auto_reset_day}">
+								</div>
+								
+								<div class="form-group form-group-label">
+									<label class="floating-label" for="auto_reset_bandwidth">重置流量值(GB)</label>
+									<input class="form-control" id="auto_reset_bandwidth" type="number" value="{$user->auto_reset_bandwidth}">
+								</div>
+							</div>
+						</div>
+					</div>
 					
 					
 					<div class="card">
@@ -101,7 +139,7 @@
 							<div class="card-inner">
 								<div class="form-group form-group-label">
 									<label class="floating-label" for="invite_num">可用邀请数量</label>
-									<input class="form-control" id="invite_num" type="text" value="{$user->invite_num}">
+									<input class="form-control" id="invite_num" type="number" value="{$user->invite_num}">
 								</div>
 								
 								<div class="form-group form-group-label">
@@ -118,12 +156,12 @@
 							<div class="card-inner">
 								<div class="form-group form-group-label">
 									<label class="floating-label" for="group">用户群组（用户只能访问到组别等于这个数字或0的节点）</label>
-									<input class="form-control" id="group" type="text" value="{$user->node_group}">
+									<input class="form-control" id="group" type="number" value="{$user->node_group}">
 								</div>
 								
 								<div class="form-group form-group-label">
 									<label class="floating-label" for="class">用户级别（用户只能访问到等级小于等于这个数字的节点）</label>
-									<input class="form-control" id="class" type="text" value="{$user->class}">
+									<input class="form-control" id="class" type="number" value="{$user->class}">
 								</div>
 								
 								
@@ -138,6 +176,14 @@
 									<input class="form-control" id="expire_in" type="text" value="{$user->expire_in}">
 								</div>
 								
+							</div>
+						</div>
+					</div>
+					
+					<div class="card">
+						<div class="card-main">
+							<div class="card-inner">
+								
 								<div class="form-group form-group-label">
 									<label class="floating-label" for="node_speedlimit">用户限速，用户在每个节点所享受到的速度(0 为不限制)(Mbps)</label>
 									<input class="form-control" id="node_speedlimit" type="text" value="{$user->node_speedlimit}">
@@ -146,6 +192,23 @@
 								<div class="form-group form-group-label">
 									<label class="floating-label" for="node_connector">用户同时连接 IP 数(0 为不限制)</label>
 									<input class="form-control" id="node_connector" type="text" value="{$user->node_connector}">
+								</div>
+							</div>
+						</div>
+					</div>
+					
+					<div class="card">
+						<div class="card-main">
+							<div class="card-inner">
+								
+								<div class="form-group form-group-label">
+									<label class="floating-label" for="node_speedlimit">禁止用户访问的IP，一行一个</label>
+									<textarea class="form-control" id="forbidden_ip" rows="8">{$user->get_forbidden_ip()}</textarea>
+								</div>
+								
+								<div class="form-group form-group-label">
+									<label class="floating-label" for="node_speedlimit">禁止用户访问的端口，一行一个</label>
+									<textarea class="form-control" id="forbidden_port" rows="8">{$user->get_forbidden_port()}</textarea>
 								</div>
 							</div>
 						</div>
@@ -216,6 +279,8 @@
                 data: {
                     email: $("#email").val(),
                     pass: $("#pass").val(),
+					auto_reset_day: $("#auto_reset_day").val(),
+                    auto_reset_bandwidth: $("#auto_reset_bandwidth").val(),
                     port: $("#port").val(),
 					group: $("#group").val(),
                     passwd: $("#passwd").val(),
@@ -227,16 +292,28 @@
                     enable: enable,
                     is_admin: is_admin,
                     ref_by: $("#ref_by").val(),
+                    forbidden_ip: $("#forbidden_ip").val(),
+                    forbidden_port: $("#forbidden_port").val(),
 					class: $("#class").val(),
 					class_expire: $("#class_expire").val(),
 					expire_in: $("#expire_in").val(),
-					node_connector: $("#node_connector").val()
+					node_connector: $("#node_connector").val(){if $config['enable_rss']=='true'},
+					protocol: $("#protocol").val(),
+					protocol_param: $("#protocol_param").val(),
+					obfs: $("#obfs").val(),
+					obfs_param: $("#obfs_param").val()
+					{else},
+					protocol: 'origin',
+					protocol_param: '',
+					obfs: 'plain',
+					obfs_param: ''
+					{/if}
                 },
                 success: function (data) {
                     if (data.ret) {
                         $("#result").modal();
-                        $("#msg").html(data.msg+"  五秒后跳转。");
-                        window.setTimeout("location.href='/admin/user'", 5000);
+                        $("#msg").html(data.msg);
+                        window.setTimeout("location.href=top.document.referrer", {$config['jump_delay']});
                     } else {
                         $("#result").modal();
                         $("#msg").html(data.msg);

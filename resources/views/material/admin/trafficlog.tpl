@@ -20,7 +20,7 @@
 			</div>
 		</div>
 		<div class="container">
-			<div class="col-lg-12 col-lg-push-0 col-sm-10 col-sm-push-1">
+			<div class="col-lg-12 col-sm-12">
 				<section class="content-inner margin-top-no">
 				
 					<div class="card">
@@ -46,16 +46,18 @@
                                 <th>记录时间</th>
                             </tr>
                             {foreach $logs as $log}
-                                <tr>
-                                    <td>#{$log->id}</td>
-                                    <td>{$log->user_id}</td>
-									<td>{$log->user()->user_name}</td>
-                                    <td>{$log->node()->name}</td>
-                                    <td>{$log->rate}</td>
-                                    <td>{$log->totalUsed()}</td>
-                                    <td>{$log->traffic}</td>
-                                    <td>{$log->logTime()}</td>
-                                </tr>
+								{if $log->user() != NULL && $log->node() != NULL}
+									<tr>
+										<td>#{$log->id}</td>
+										<td>{$log->user_id}</td>
+										<td>{$log->user()->user_name}</td>
+										<td>{$log->node()->name}</td>
+										<td>{$log->rate}</td>
+										<td>{$log->totalUsed()}</td>
+										<td>{$log->traffic}</td>
+										<td>{$log->logTime()}</td>
+									</tr>
+								{/if}
                             {/foreach}
                         </table>
                         {$logs->render()}

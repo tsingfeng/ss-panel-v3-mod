@@ -33,17 +33,18 @@ class TicketController extends AdminController
 		$content = $request->getParam('content');
 		$status = $request->getParam('status');
 		
-		if(strpos("admin",$content)!=-1||strpos("user",$content)!=-1)
-		{
-			$res['ret'] = 0;
-			$res['msg'] = "请求中有不正当的词语。";
-			return $this->echoJson($response, $res);
-		}
 		
 		if($content==""||$status=="")
 		{
 			$res['ret'] = 0;
 			$res['msg'] = "请填全";
+			return $this->echoJson($response, $res);
+		}
+		
+		if(strpos($content,"admin")!=FALSE||strpos($content,"user")!=FALSE)
+		{
+			$res['ret'] = 0;
+			$res['msg'] = "请求中有不正当的词语。";
 			return $this->echoJson($response, $res);
 		}
 		

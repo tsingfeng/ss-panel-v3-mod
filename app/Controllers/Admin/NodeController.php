@@ -4,6 +4,7 @@ namespace App\Controllers\Admin;
 
 use App\Models\Node;
 use App\Utils\Radius;
+use App\Utils\Telegram;
 use App\Controllers\AdminController;
 
 class NodeController extends AdminController
@@ -30,6 +31,7 @@ class NodeController extends AdminController
         $node->server =  $request->getParam('server');
         $node->method =  $request->getParam('method');
         $node->custom_method =  $request->getParam('custom_method');
+        $node->custom_rss =  $request->getParam('custom_rss');
         $node->traffic_rate = $request->getParam('rate');
         $node->info = $request->getParam('info');
         $node->type = $request->getParam('type');
@@ -60,6 +62,9 @@ class NodeController extends AdminController
             $rs['msg'] = "添加失败";
             return $response->getBody()->write(json_encode($rs));
         }
+		
+		Telegram::Send("新节点添加~".$request->getParam('name'));
+		
         $rs['ret'] = 1;
         $rs['msg'] = "节点添加成功";
         return $response->getBody()->write(json_encode($rs));
@@ -83,6 +88,7 @@ class NodeController extends AdminController
         $node->server =  $request->getParam('server');
         $node->method =  $request->getParam('method');
         $node->custom_method =  $request->getParam('custom_method');
+        $node->custom_rss =  $request->getParam('custom_rss');
         $node->traffic_rate = $request->getParam('rate');
         $node->info = $request->getParam('info');
 		$node->node_speedlimit = $request->getParam('node_speedlimit');
@@ -90,7 +96,10 @@ class NodeController extends AdminController
 		$node->sort = $request->getParam('sort');
 		if($node->sort==0)
 		{
-			$node->node_ip=gethostbyname($request->getParam('server'));
+			if(time()-$node->node_heartbeat<300)
+			{
+				$node->node_ip=gethostbyname($request->getParam('server'));
+			}
 		}
 		else
 		{
@@ -99,8 +108,20 @@ class NodeController extends AdminController
 		
 		if($node->sort==1)
 		{
-			$node->node_ip=gethostbyname($request->getParam('server'));
-			Radius::AddNas($node->node_ip,$request->getParam('server'));
+			$SS_Node=Node::where('sort','=',0)->where('server','=',$request->getParam('server'))->first();
+			if($SS_Node!=null)
+			{
+				if(time()-$SS_Node->node_heartbeat<300||$SS_Node->node_heartbeat==0)
+				{
+					$node->node_ip=gethostbyname($request->getParam('server'));
+					Radius::AddNas($node->node_ip,$request->getParam('server'));
+				}
+			}
+			else
+			{
+				$node->node_ip=gethostbyname($request->getParam('server'));
+				Radius::AddNas($node->node_ip,$request->getParam('server'));
+			}
 		}
 
         $node->status = $request->getParam('status');
@@ -113,6 +134,9 @@ class NodeController extends AdminController
             $rs['msg'] = "修改失败";
             return $response->getBody()->write(json_encode($rs));
         }
+		
+		Telegram::Send("节点信息被修改~".$request->getParam('name'));
+		
         $rs['ret'] = 1;
         $rs['msg'] = "修改成功";
         return $response->getBody()->write(json_encode($rs));
@@ -127,11 +151,16 @@ class NodeController extends AdminController
 			Radius::DelNas($node->node_ip);
 		}
 		
+		$name = $node->name;
+		
         if(!$node->delete()){
             $rs['ret'] = 0;
             $rs['msg'] = "删除失败";
             return $response->getBody()->write(json_encode($rs));
         }
+		
+		Telegram::Send("节点被删除~".$name);
+		
         $rs['ret'] = 1;
         $rs['msg'] = "删除成功";
         return $response->getBody()->write(json_encode($rs));

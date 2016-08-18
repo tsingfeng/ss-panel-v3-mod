@@ -56,13 +56,11 @@
 									<div class="card-inner">
 										<p class="card-heading">说明</p>
 
-										<p>用户注册48小时后，才可以生成邀请码。</p>
-
 										<p>邀请码暂时无法购买，请珍惜。</p>
 
 										<p>公共页面不定期发放邀请码，如果用完邀请码可以关注公共邀请。</p>
 										
-										<p>您每拉一位用户注册，当 Ta 充值时您就会获得他充值金额的 {$config["code_payback"]} % 的提成。</p>
+										<p>您每拉一位用户注册，当 TA 充值时您就会获得 TA 充值金额的 <code>{$config["code_payback"]} %</code> 的提成。</p>
 									</div>
 									
 								</div>

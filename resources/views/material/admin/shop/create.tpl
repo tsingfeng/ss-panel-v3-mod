@@ -14,7 +14,7 @@
 			</div>
 		</div>
 		<div class="container">
-			<div class="col-lg-12 col-lg-push-0 col-sm-10 col-sm-push-1">
+			<div class="col-lg-12 col-sm-12">
 				<section class="content-inner margin-top-no">
 					
 					<div class="card">
@@ -49,6 +49,14 @@
 								<div class="form-group form-group-label">
 									<label class="floating-label" for="bandwidth">流量（GB）</label>
 									<input class="form-control" id="bandwidth" type="text" value="0">
+								</div>
+								
+								<div class="form-group form-group-label">
+									<div class="checkbox switch">
+										<label for="auto_reset_bandwidth">
+											<input class="access-hide" id="auto_reset_bandwidth" type="checkbox"><span class="switch-toggle"></span>续费时自动重置用户流量为上面这个流量值
+										</label>
+									</div>
 								</div>
 								
 							</div>
@@ -130,13 +138,22 @@
 <script>
     $(document).ready(function () {
         function submit() {
-		
+			if(document.getElementById('auto_reset_bandwidth').checked)
+			{
+				var auto_reset_bandwidth=1;
+			}
+			else
+			{
+				var auto_reset_bandwidth=0;
+			}
+			
             $.ajax({
                 type: "POST",
                 url: "/admin/shop",
                 dataType: "json",
                 data: {
                     name: $("#name").val(),
+					auto_reset_bandwidth: auto_reset_bandwidth,
                     price: $("#price").val(),
                     auto_renew: $("#auto_renew").val(),
                     bandwidth: $("#bandwidth").val(),
@@ -147,8 +164,8 @@
                 success: function (data) {
                     if (data.ret) {
                         $("#result").modal();
-                        $("#msg").html(data.msg+"  五秒后跳转。");
-                        window.setTimeout("location.href='/admin/shop'", 5000);
+                        $("#msg").html(data.msg);
+                        window.setTimeout("location.href=top.document.referrer", {$config['jump_delay']});
                     } else {
                         $("#result").modal();
                         $("#msg").html(data.msg);

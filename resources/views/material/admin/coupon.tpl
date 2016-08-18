@@ -49,7 +49,7 @@
 								<div class="form-group form-group-label">
 									<div class="checkbox switch">
 										<label for="onetime">
-											<input class="access-hide" id="onetime" type="checkbox"><span class="switch-toggle"></span>一次性的
+											<input class="access-hide" id="onetime" type="checkbox"><span class="switch-toggle"></span>一次性的,只在用户当次购买时有效
 										</label>
 									</div>
 								</div>
@@ -158,8 +158,8 @@
                 success: function (data) {
                     if (data.ret) {
                         $("#result").modal();
-                        $("#msg").html(data.msg+"  五秒后跳转。");
-                        window.setTimeout("location.href='/admin/coupon'", 5000);
+                        $("#msg").html(data.msg);
+                        window.setTimeout("location.href='/admin/coupon'", {$config['jump_delay']});
                     }
                     // window.location.reload();
                 },

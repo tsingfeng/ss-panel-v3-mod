@@ -11,10 +11,12 @@ use App\Services\Boot;
 
 //  BASE_PATH
 define('BASE_PATH', __DIR__);
-define('VERSION', '201605111630');
+define('VERSION', '201608181300-v2 final');
 
 // Vendor Autoload
 require BASE_PATH.'/vendor/autoload.php';
+
+require BASE_PATH."/config/.config.php";
 
 Boot::loadEnv();
 Boot::setDebug();

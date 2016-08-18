@@ -16,7 +16,7 @@
 			</div>
 		</div>
 		<div class="container">
-			<div class="col-lg-12 col-lg-push-0 col-sm-10 col-sm-push-1">
+			<div class="col-lg-12 col-md-12">
 				<section class="content-inner margin-top-no">
 					
 					
@@ -97,8 +97,8 @@
                 success: function (data) {
                     if (data.ret) {
                         $("#result").modal();
-                        $("#msg").html(data.msg+"  五秒后跳转。");
-                        window.setTimeout("location.href='/admin/code'", 5000);
+                        $("#msg").html(data.msg);
+                        window.setTimeout("location.href=top.document.referrer", {$config['jump_delay']});
                     } else {
                         $("#msg-error").hide(10);
                         $("#msg-error").show(100);

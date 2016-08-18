@@ -70,6 +70,16 @@ class User extends Model
         $this->pass = Hash::passwordHash($pwd);
         $this->save();
     }
+	
+	public function get_forbidden_ip()
+    {
+        return str_replace(",", PHP_EOL, $this->attributes['forbidden_ip']);
+    }
+
+    public function get_forbidden_port()
+    {
+        return str_replace(",", PHP_EOL, $this->attributes['forbidden_port']);
+    }
 
     public function updateSsPwd($pwd)
     {
@@ -117,19 +127,33 @@ class User extends Model
         $transfer_enable = $this->attributes['transfer_enable'];
         return Tools::flowAutoShow($transfer_enable);
     }
-
+    public function enableTrafficInGB()
+    {
+        $transfer_enable = $this->attributes['transfer_enable'];
+        return Tools::flowToGB($transfer_enable);
+    }
     public function usedTraffic()
     {
         $total = $this->attributes['u'] + $this->attributes['d'];
         return Tools::flowAutoShow($total);
     }
-	
-
     public function unusedTraffic()
     {
         $total = $this->attributes['u'] + $this->attributes['d'];
         $transfer_enable = $this->attributes['transfer_enable'];
         return Tools::flowAutoShow($transfer_enable - $total);
+    }
+	
+	public function TodayusedTraffic()
+    {
+        $total = $this->attributes['u'] + $this->attributes['d']-$this->attributes['last_day_t'];
+        return Tools::flowAutoShow($total);
+    }
+	
+	public function LastusedTraffic()
+    {
+        $total = $this->attributes['last_day_t'];
+        return Tools::flowAutoShow($total);
     }
 
     public function isAbleToCheckin()

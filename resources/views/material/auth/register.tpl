@@ -31,7 +31,6 @@
 											</div>
 										</div>
 										
-										
 										<div class="form-group form-group-label">
 											<div class="row">
 												<div class="col-md-10 col-md-push-1">
@@ -40,6 +39,18 @@
 												</div>
 											</div>
 										</div>
+										
+										{if $enable_email_verify == 'true'}
+										<div class="form-group form-group-label">
+											<div class="row">
+												<div class="col-md-10 col-md-push-1">
+													<label class="floating-label" for="email_code">邮箱验证码</label>
+													<input class="form-control" id="email_code" type="text">
+													<button id="email_verify" class="btn btn-block btn-brand-accent waves-attach waves-light">获取验证码</button>
+												</div>
+											</div>
+										</div>
+										{/if}
 										
 										<div class="form-group form-group-label">
 											<div class="row">
@@ -69,6 +80,7 @@
 														<option value="1">微信</option>
 														<option value="2">QQ</option>
 														<option value="3">Google+</option>
+														<option value="4">Telegram</option>
 													</select>
 												</div>
 											</div>
@@ -86,15 +98,26 @@
 										
 										
 										
-										
-										<div class="form-group form-group-label">
-											<div class="row">
-												<div class="col-md-10 col-md-push-1">
-													<label class="floating-label" for="code">邀请码</label>
-													<input class="form-control" id="code" type="text" value="{$code}">
+										{if $enable_invite_code == 'true'}
+											<div class="form-group form-group-label">
+												<div class="row">
+													<div class="col-md-10 col-md-push-1">
+														<label class="floating-label" for="code">邀请码</label>
+														<input class="form-control" id="code" type="text" value="{$code}">
+													</div>
 												</div>
 											</div>
-										</div>
+										{/if}
+										
+										{if $geetest_html != null}
+											<div class="form-group form-group-label">
+												<div class="row">
+													<div class="col-md-10 col-md-push-1">
+														<div id="embed-captcha"></div>
+													</div>
+												</div>
+											</div>
+										{/if}
 										
 										<div class="form-group">
 											<div class="row">
@@ -135,7 +158,7 @@
 										{include file='reg_tos.tpl'}
 									</div>
 									<div class="modal-footer">
-										<p class="text-right"><button class="btn btn-flat btn-brand-accent waves-attach waves-effect" data-dismiss="modal" type="button">我不服</button><button class="btn btn-flat btn-brand-accent waves-attach waves-effect" data-dismiss="modal" id="reg" type="button">资慈</button></p>
+										<p class="text-right"><button class="btn btn-flat btn-brand-accent waves-attach waves-effect" data-dismiss="modal" type="button" id="cancel">我不服</button><button class="btn btn-flat btn-brand-accent waves-attach waves-effect" data-dismiss="modal" id="reg" type="button">资慈</button></p>
 										
 									</div>
 								</div>
@@ -155,6 +178,9 @@
 <script>
     $(document).ready(function(){
         function register(){
+			
+			document.getElementById("tos").disabled = true; 
+			
             $.ajax({
                 type:"POST",
                 url:"/auth/register",
@@ -165,24 +191,30 @@
                     passwd: $("#passwd").val(),
                     repasswd: $("#repasswd").val(),
 					wechat: $("#wechat").val(),
-					imtype: $("#imtype").val(),
-                    code: $("#code").val(),
-                    agree: $("#agree").val()
+					imtype: $("#imtype").val(){if $enable_invite_code == 'true'},
+					code: $("#code").val(){/if}{if $enable_email_verify == 'true'},
+					emailcode: $("#email_code").val(){/if}{if $geetest_html != null},
+					geetest_challenge: validate.geetest_challenge,
+                    geetest_validate: validate.geetest_validate,
+                    geetest_seccode: validate.geetest_seccode
+					{/if}
                 },
                 success:function(data){
                     if(data.ret == 1){
                         $("#result").modal();
-                        $("#msg").html(data.msg+"  五秒后跳转。");
-                        window.setTimeout("location.href='/auth/login'", 5000);
+                        $("#msg").html(data.msg);
+                        window.setTimeout("location.href='/auth/login'", {$config['jump_delay']});
                     }else{
                         $("#result").modal();
                         $("#msg").html(data.msg);
+						document.getElementById("tos").disabled = false; 
                     }
                 },
                 error:function(jqXHR){
                     $("#msg-error").hide(10);
                     $("#msg-error").show(100);
                     $("#msg-error-p").html("发生错误："+jqXHR.status);
+					document.getElementById("tos").disabled = false; 
                 }
             });
         }
@@ -191,17 +223,120 @@
                 $("#tos_modal").modal();
             }
         });
-        $("#reg").click(function(){
+		
+		{if $geetest_html != null}
+		$('div.modal').on('shown.bs.modal', function() {
+			$("div.gt_slider_knob").hide();
+		});
+		
+		
+		$('div.modal').on('hidden.bs.modal', function() {
+			$("div.gt_slider_knob").show();
+		});
+		
+        
+		{/if}
+		
+		$("#reg").click(function(){
             register();
         });
 		
 		$("#tos").click(function(){
+			{if $geetest_html != null}
+			if(typeof validate == 'undefined')
+			{
+				$("#result").modal();
+                $("#msg").html("请滑动验证码来完成验证。");
+				return;
+			}
+			
+			if (!validate) {
+				$("#result").modal();
+                $("#msg").html("请滑动验证码来完成验证。");
+				return;
+			}
+			
+			{/if}
             $("#tos_modal").modal();
         });
     })
 </script>
 
 
+{if $enable_email_verify == 'true'}
+<script>
+var wait=60;
+function time(o) {
+		if (wait == 0) {
+			o.removeAttr("disabled");			
+			o.text("获取验证码");
+			wait = 60;
+		} else {
+			o.attr("disabled","disabled");
+			o.text("重新发送(" + wait + ")");
+			wait--;
+			setTimeout(function() {
+				time(o)
+			},
+			1000)
+		}
+	}
+
+
+
+    $(document).ready(function () {
+        $("#email_verify").click(function () {
+			time($("#email_verify"));
+			
+            $.ajax({
+                type: "POST",
+                url: "send",
+                dataType: "json",
+                data: {
+                    email: $("#email").val()
+                },
+                success: function (data) {
+                    if (data.ret) {
+                        $("#result").modal();
+						$("#msg").html(data.msg);
+						
+                    } else {
+                        $("#result").modal();
+						$("#msg").html(data.msg);
+                    }
+                },
+                error: function (jqXHR) {
+                    $("#result").modal();
+					$("#msg").html(data.msg+"     出现了一些错误。");
+                }
+            })
+        })
+    })
+</script>
+{/if}
+
+{if $geetest_html != null}
+<script>
+	var handlerEmbed = function (captchaObj) {
+        // 将验证码加到id为captcha的元素里
+		
+		captchaObj.onSuccess(function () {
+            validate = captchaObj.getValidate();
+        });
+		
+        captchaObj.appendTo("#embed-captcha");
+        // 更多接口参考：http://www.geetest.com/install/sections/idx-client-sdk.html
+    };
+	
+	initGeetest({
+		gt: "{$geetest_html->gt}",
+		challenge: "{$geetest_html->challenge}",
+		product: "embed", // 产品形式，包括：float，embed，popup。注意只对PC版验证码有效
+		offline: {if $geetest_html->success}0{else}1{/if} // 表示用户后台检测极验服务器是否宕机，与SDK配合，用户一般不需要关注
+	}, handlerEmbed);
+</script>
+
+{/if}
 
 
 

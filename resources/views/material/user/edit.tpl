@@ -53,50 +53,6 @@
 							<div class="card-main">
 								<div class="card-inner">
 									<div class="card-inner">
-										<p class="card-heading">联络方式修改</p>
-										<p>当前联络方式：
-										{if $user->im_type==1}
-										微信
-										{/if}
-										
-										{if $user->im_type==2}
-										QQ
-										{/if}
-										
-										{if $user->im_type==3}
-										Google+
-										{/if}
-										
-										{$user->im_value}</p>
-										<div class="form-group form-group-label">
-											<label class="floating-label" for="imtype">选择您的联络方式</label>
-											<select class="form-control" id="imtype">
-												<option></option>
-												<option value="1">微信</option>
-												<option value="2">QQ</option>
-												<option value="3">Google+</option>
-											</select>
-										</div>
-											
-										<div class="form-group form-group-label">
-											<label class="floating-label" for="wechat">在这输入联络方式账号</label>
-											<input class="form-control" id="wechat" type="text">
-										</div>
-										
-									</div>
-									<div class="card-action">
-										<div class="card-action-btn pull-left">
-											<button class="btn btn-flat waves-attach" id="wechat-update" ><span class="icon">check</span>&nbsp;提交</button>
-										</div>
-									</div>
-								</div>
-							</div>
-						</div>
-					
-						<div class="card margin-bottom-no">
-							<div class="card-main">
-								<div class="card-inner">
-									<div class="card-inner">
 										<p class="card-heading">连接密码修改</p>
 										<p>当前连接密码：{$user->passwd}</p>
 										<div class="form-group form-group-label">
@@ -113,7 +69,7 @@
 								</div>
 							</div>
 						</div>
-					
+						
 						<div class="card margin-bottom-no">
 							<div class="card-main">
 								<div class="card-inner">
@@ -124,14 +80,20 @@
 											<label class="floating-label" for="method">加密方式</label>
 											<select id="method" class="form-control">
 												<option value="rc4-md5">RC4-MD5</option>
+												<option value="rc4-md5-6">RC4-MD5-6</option>
 												<option value="aes-128-cfb">AES-128-CFB</option>
 												<option value="aes-192-cfb">AES-192-CFB</option>
 												<option value="aes-256-cfb">AES-256-CFB</option>
+												<option value="aes-128-ctr">AES-128-CTR</option>
+												<option value="aes-192-ctr">AES-192-CTR</option>
+												<option value="aes-256-ctr">AES-256-CTR</option>
 												<option value="camellia-128-cfb">CAMELLIA-128-CFB</option>
 												<option value="camellia-192-cfb">CAMELLIA-192-CFB</option>
 												<option value="camellia-256-cfb">CAMELLIA-256-CFB</option>
+												<option value="bf-cfb">BF-CFB</option>
 												<option value="cast5-cfb">CAST5-CFB</option>
-												<option value="des-cdb">DES-CDB</option>
+												<option value="des-cfb">DES-CFB</option>
+												<option value="des-cfb">DES-EDE3-CFB</option>
 												<option value="idea-cfb">IDEA-CFB</option>
 												<option value="rc2-cfb">RC2-CFB</option>
 												<option value="seed-cfb">SEED-CFB</option>
@@ -150,6 +112,119 @@
 								</div>
 							</div>
 						</div>
+
+						<div class="card margin-bottom-no">
+							<div class="card-main">
+								<div class="card-inner">
+									<div class="card-inner">
+										<p class="card-heading">联络方式修改</p>
+										<p>当前联络方式：
+										{if $user->im_type==1}
+										微信
+										{/if}
+										
+										{if $user->im_type==2}
+										QQ
+										{/if}
+										
+										{if $user->im_type==3}
+										Google+
+										{/if}
+										
+										{if $user->im_type==4}
+										Telegram
+										{/if}
+										
+										{$user->im_value}</p>
+										<div class="form-group form-group-label">
+											<label class="floating-label" for="imtype">选择您的联络方式</label>
+											<select class="form-control" id="imtype">
+												<option></option>
+												<option value="1">微信</option>
+												<option value="2">QQ</option>
+												<option value="3">Google+</option>
+												<option value="4">Telegram</option>
+											</select>
+										</div>
+											
+										<div class="form-group form-group-label">
+											<label class="floating-label" for="wechat">在这输入联络方式账号</label>
+											<input class="form-control" id="wechat" type="text">
+										</div>
+										
+									</div>
+									<div class="card-action">
+										<div class="card-action-btn pull-left">
+											<button class="btn btn-flat waves-attach" id="wechat-update" ><span class="icon">check</span>&nbsp;提交</button>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					
+						
+						
+						{if $config['enable_rss']=='true'}
+						<div class="card margin-bottom-no">
+							<div class="card-main">
+								<div class="card-inner">
+									<div class="card-inner">
+										<p class="card-heading">SSR 协议&混淆设置</p>
+										<p>当前协议：{$user->protocol}</p>
+										<p>注意：如果需要兼容原版SS请选择带_compatible的兼容选项！</p>
+										<div class="form-group form-group-label">
+											<label class="floating-label" for="protocol">协议</label>
+											<select id="protocol" class="form-control">
+												<option value="origin">origin</option>
+												<option value="verify_simple">verify_simple</option>
+												<option value="verify_deflate">verify_deflate</option>
+												<option value="verify_sha1">verify_sha1</option>
+												<option value="verify_sha1_compatible">verify_sha1_compatible</option>
+												<option value="auth_simple">auth_simple</option>
+												<option value="auth_sha1">auth_sha1</option>
+												<option value="auth_sha1_compatible"> auth_sha1_compatible</option>
+												<option value="auth_sha1_v2">auth_sha1_v2</option>
+												<option value="auth_sha1_v2_compatible">auth_sha1_v2_compatible</option>
+											</select>
+										</div>
+										
+									</div>
+									
+									<div class="card-inner">
+										<p>当前混淆方式：{$user->obfs}</p>
+										<p>注意：如果需要兼容原版SS请选择带_compatible的兼容选项！</p>
+										<div class="form-group form-group-label">
+											<label class="floating-label" for="obfs">混淆方式</label>
+											<select id="obfs" class="form-control">
+												<option value="plain">plain</option>
+												<option value="http_simple">http_simple</option>
+												<option value="http_simple_compatible"> http_simple_compatible</option>
+												<option value="tls_simple">tls_simple</option>
+												<option value="tls_simple_compatible">tls_simple_compatible</option>
+												<option value="random_head">random_head</option>
+												<option value="random_head_compatible">random_head_compatible</option>
+												<option value="tls1.0_session_auth">tls1.0_session_auth</option>
+												<option value="tls1.0_session_auth_compatible">tls1.0_session_auth_compatible</option>
+												<option value="tls1.2_ticket_auth">tls1.2_ticket_auth</option>
+												<option value="tls1.2_ticket_auth_compatible">tls1.2_ticket_auth_compatible</option>
+											</select>
+										</div>
+									</div>
+									
+									<div class="card-action">
+										<div class="card-action-btn pull-left">
+											<button class="btn btn-flat waves-attach" id="rss-update" ><span class="icon">check</span>&nbsp;提交</button>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						
+						{/if}
+						
+						
+						
+						
 						
 					
 					
@@ -178,6 +253,11 @@
 							</div>
 						</div>
 						
+					</div>
+					
+					
+					<div class="col-lg-6 col-md-6">
+						
 						<div class="card margin-bottom-no">
 							<div class="card-main">
 								<div class="card-inner">
@@ -195,10 +275,7 @@
 							</div>
 						</div>
 						
-					</div>
 					
-					
-					<div class="col-lg-6 col-md-6">
 					
 						<div class="card margin-bottom-no">
 							<div class="card-main">
@@ -240,8 +317,8 @@
 										<div class="form-group form-group-label">
 											<label class="floating-label" for="ga-enable">验证设置</label>
 											<select id="ga-enable" class="form-control">
-												<option value="1">要求验证</option>
 												<option value="0">不要求</option>
+												<option value="1">要求验证</option>
 											</select>
 										</div>
 										
@@ -433,6 +510,67 @@
                 data: {
                     wechat: $("#wechat").val(),
 					imtype: $("#imtype").val()
+                },
+                success: function (data) {
+                    if (data.ret) {
+                        $("#result").modal();
+						$("#msg").html(data.msg);
+                    } else {
+                        $("#result").modal();
+						$("#msg").html(data.msg);
+                    }
+                },
+                error: function (jqXHR) {
+                    $("#result").modal();
+					$("#msg").html(data.msg+"     出现了一些错误。");
+                }
+            })
+        })
+    })
+</script>
+
+{if $config['enable_rss']=='true'}
+<script>
+    $(document).ready(function () {
+        $("#rss-update").click(function () {
+            $.ajax({
+                type: "POST",
+                url: "rss",
+                dataType: "json",
+                data: {
+                    protocol: $("#protocol").val(),
+					obfs: $("#obfs").val()
+                },
+                success: function (data) {
+                    if (data.ret) {
+                        $("#result").modal();
+						$("#msg").html(data.msg);
+                    } else {
+                        $("#result").modal();
+						$("#msg").html(data.msg);
+                    }
+                },
+                error: function (jqXHR) {
+                    $("#result").modal();
+					$("#msg").html(data.msg+"     出现了一些错误。");
+                }
+            })
+        })
+    })
+</script>
+{/if}
+
+
+<script>
+    $(document).ready(function () {
+        $("#relay-update").click(function () {
+            $.ajax({
+                type: "POST",
+                url: "relay",
+                dataType: "json",
+                data: {
+                    relay_enable: $("#relay_enable").val(),
+					relay_info: $("#relay_info").val()
                 },
                 success: function (data) {
                     if (data.ret) {

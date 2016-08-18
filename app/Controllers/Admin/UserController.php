@@ -2,10 +2,11 @@
 
 namespace App\Controllers\Admin;
 
-use App\Models\User,App\Models\Ip;
+use App\Models\User,App\Models\Ip,App\Models\RadiusBan;
 use App\Controllers\AdminController;
-use App\Utils\Hash,App\Utils\Radius,App\Utils\Da,App\Utils\QQWry;
+use App\Utils\Hash,App\Utils\Radius,App\Utils\QQWry;
 use App\Utils\Wecenter;
+use App\Utils\Tools;
 
 class UserController extends AdminController
 {
@@ -46,7 +47,7 @@ class UserController extends AdminController
 				if(!isset($userip[$single->userid][$single->ip]))
 				{
 					$useripcount[$single->userid]=$useripcount[$single->userid]+1;
-					$location=$iplocation->getlocation($single->ip);
+					$location=$iplocation->getlocation($single->ip());
 					$userip[$single->userid][$single->ip]=iconv('gbk', 'utf-8//IGNORE', $location['country'].$location['area']);
 				}
 			}
@@ -171,13 +172,9 @@ class UserController extends AdminController
 
 		$email1=$user->email;
 
-		Da::delete($email1);
-
         $user->email =  $request->getParam('email');
 
 		$email2=$request->getParam('email');
-
-		Da::add($email2);
 
 		$passwd=$request->getParam('passwd');
 
@@ -188,9 +185,16 @@ class UserController extends AdminController
             $user->pass = Hash::passwordHash($request->getParam('pass'));
 			Wecenter::ChangeUserName($email1,$email2,$request->getParam('pass'),$user->user_name);
         }
+		
+		$user->auto_reset_day =  $request->getParam('auto_reset_day');
+        $user->auto_reset_bandwidth = $request->getParam('auto_reset_bandwidth');
         $user->port =  $request->getParam('port');
         $user->passwd = $request->getParam('passwd');
-        $user->transfer_enable = $request->getParam('transfer_enable');
+        $user->protocol = $request->getParam('protocol');
+        $user->protocol_param = $request->getParam('protocol_param');
+        $user->obfs = $request->getParam('obfs');
+        $user->obfs_param = $request->getParam('obfs_param');
+        $user->transfer_enable = Tools::toGB($request->getParam('transfer_enable'));
         $user->invite_num = $request->getParam('invite_num');
         $user->method = $request->getParam('method');
 		$user->node_speedlimit = $request->getParam('node_speedlimit');
@@ -203,6 +207,10 @@ class UserController extends AdminController
 		$user->class = $request->getParam('class');
 		$user->class_expire = $request->getParam('class_expire');
 		$user->expire_in = $request->getParam('expire_in');
+		
+		$user->forbidden_ip = str_replace(PHP_EOL, ",", $request->getParam('forbidden_ip'));
+		$user->forbidden_port = str_replace(PHP_EOL, ",", $request->getParam('forbidden_port'));
+		
         if(!$user->save()){
             $rs['ret'] = 0;
             $rs['msg'] = "修改失败";
@@ -221,9 +229,10 @@ class UserController extends AdminController
 		
 		Radius::Delete($email1);
 		
+		RadiusBan::where('userid','=',$user->id)->delete();
+		
 		Wecenter::Delete($email1);
 			
-		Da::delete($email1);
 			
         if(!$user->delete()){
             $rs['ret'] = 0;

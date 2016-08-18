@@ -16,7 +16,7 @@ Class Wecenter
      */
     static function Add($user,$pwd)
     {
-        if(Config::get('wecenter_db_user')!='')
+        if(Config::get('enable_wecenter')=='true')
 		{
 			$email=$user->email;
 			$exists=WecenterUser::where("email",$email)->first();
@@ -25,7 +25,7 @@ Class Wecenter
 			{
 				$exists=new WecenterUser();
 				$exists->password=md5(md5($pwd).Config::get('salt'));
-				$exists->user_name=$username;
+				$exists->user_name=$user->user_name;
 				$exists->email=$email;
 				$exists->salt=Config::get('salt');
 				$exists->group_id=5;
@@ -43,7 +43,7 @@ Class Wecenter
 	
 	static function Delete($email)
 	{
-		if(Config::get('wecenter_db_user')!='')
+		if(Config::get('enable_wecenter')=='true')
 		{
 			WecenterUser::where("email",$email)->delete();
 		}
@@ -51,7 +51,7 @@ Class Wecenter
 	
 	static function ChangeUserName($email1,$email2,$pwd,$username)
 	{
-		if(Config::get('wecenter_db_user')!='')
+		if(Config::get('enable_wecenter')=='true')
 		{
 			$email=$user->email;
 			$exists=WecenterUser::where("email",$email1)->first();
@@ -79,29 +79,25 @@ Class Wecenter
 	
 	static function Login($user,$pwd,$time)
 	{
-		if(Config::get('wecenter_db_user')!='')
+		if(Config::get('enable_wecenter')=='true')
 		{
-			$dsn = "mysql:host=".Config::get('wecenter_db_host').";dbname=".Config::get('wecenter_db_database');  
-			$db = new \PDO($dsn, Config::get('wecenter_db_user'), Config::get('wecenter_db_password'));
 			$email=$user->email;
-			$stmt = $db->prepare("SELECT * FROM `aws_users` where `email`=:email");
-			$stmt->execute(array(':email'=>$email));
-			$resultarray = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+			$exists=WecenterUser::where("email",$email)->first();
 			
 			$expire_in = $time+time();
 			
-			Utils\Cookie::setwithdomain([Config::get('wecenter_cookie_prefix')."_user_login"=>Wecenter::encode_hash(array(
-								'uid' => $resultarray[0]['uid'],
+			Utils\Cookie::setwithdomain([Config::get('wecenter_cookie_prefix')."_user_login"=>Wecenter::encode_hash(json_encode(array(
+								'uid' => $exists->uid,
 								'user_name' => $user->email,
 								'password' => md5(md5($pwd).Config::get('salt'))
-							), md5(Config::get('wecenter_cookie_key') . $_SERVER['HTTP_USER_AGENT']))],$expire_in,Config::get('wecenter_system_main_domain'));
+							)), md5(Config::get('wecenter_cookie_key') . $_SERVER['HTTP_USER_AGENT']))],$expire_in,Config::get('wecenter_system_main_domain'));
 		}
 	}
 	
 	
 	static function Loginout()
 	{
-		if(Config::get('wecenter_db_user')!='')
+		if(Config::get('enable_wecenter')=='true')
 		{
 			Utils\Cookie::setwithdomain([Config::get('wecenter_cookie_prefix')."_user_login"=>"loginout"],time()-86400,Config::get('wecenter_system_main_domain'));
 		}
@@ -109,50 +105,74 @@ Class Wecenter
 	
 	public static function encode_hash($hash_data, $hash_key = null)
 	{
-		$hash_string="";
-		
-		if (!$hash_data)
-		{
-			return false;
-		}
+		$mcrypt = mcrypt_module_open(Wecenter::get_algorithms(), '', MCRYPT_MODE_ECB, '');
 
-		foreach ($hash_data as $key => $value)
-		{
-			$hash_string .= $key . "^]+" . $value . "!;-";
-		}
+        mcrypt_generic_init($mcrypt, Wecenter::get_key($mcrypt, $hash_key), mcrypt_create_iv(mcrypt_enc_get_iv_size($mcrypt), MCRYPT_RAND));
 
-		$hash_string = substr($hash_string, 0, - 3);
+        $result = mcrypt_generic($mcrypt, gzcompress($hash_data));
 
-		// 加密干扰码，加密解密时需要用到的 key
-		if (! $hash_key)
-		{
-			$hash_key = G_COOKIE_HASH_KEY;
-		}
+        mcrypt_generic_deinit($mcrypt);
+        mcrypt_module_close($mcrypt);
 
-		// 加密过程
-		$tmp_str = "";
-		for ($i = 1; $i <= strlen($hash_string); $i ++)
-		{
-			$char = substr($hash_string, $i - 1, 1);
-			$keychar = substr($hash_key, ($i % strlen($hash_key)) - 2, 1);
-			$char = chr(ord($char) + ord($keychar));
-			$tmp_str .= $char;
-		}
-
-		$hash_string = base64_encode($tmp_str);
-
-		$hash_string = str_replace(array(
-			'+',
-			'/',
-			'='
-		), array(
-			'-',
-			'_',
-			'.'
-		), $hash_string);
-
-		return $hash_string;
+        return Wecenter::get_algorithms() . '|' . Wecenter::str_to_hex($result);
+	
 	}
 	
 	
+	private function get_key($mcrypt, $key = null)
+    {
+        if (!$key)
+        {
+            $key = Config::get('wecenter_cookie_key');
+        }
+
+        return substr($key, 0, mcrypt_enc_get_key_size($mcrypt));
+    }
+
+    private function get_algorithms()
+    {
+        $algorithms = mcrypt_list_algorithms();
+
+        foreach ($algorithms AS $algorithm)
+        {
+            if (strstr($algorithm, '-256'))
+            {
+                return $algorithm;
+            }
+        }
+
+        foreach ($algorithms AS $algorithm)
+        {
+            if (strstr($algorithm, '-128'))
+            {
+                return $algorithm;
+            }
+        }
+
+        return end($algorithms);
+    }
+
+    private function str_to_hex($string)
+    {
+		$hex = null;
+        for ($i = 0; $i < strlen($string); $i++)
+        {
+            $ord = ord($string[$i]);
+            $hexCode = dechex($ord);
+            $hex .= substr('0' . $hexCode, -2);
+        }
+
+        return strtoupper($hex);
+    }
+
+    private function hex_to_str($hex)
+    {
+		$string = null;
+        for ($i = 0; $i < strlen($hex)-1; $i += 2)
+        {
+            $string .= chr(hexdec($hex[$i] . $hex[$i + 1]));
+        }
+
+        return $string;
+    }
 }

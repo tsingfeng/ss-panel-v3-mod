@@ -24,7 +24,7 @@ class Tools
         } else if (abs($value) > $kb) {
             return round($value / $kb, 2) . "KB";
         } else {
-            return round($value, 2);
+            return round($value, 2)."B";
         }
     }
 
@@ -38,6 +38,17 @@ class Tools
     {
         $gb = 1048576 * 1024;
         return $traffic * $gb;
+    }
+	
+	
+    /**
+     * @param $traffic
+     * @return float
+     */
+    public static function flowToGB($traffic)
+    {
+        $gb = 1048576 * 1024;
+        return $traffic / $gb;
     }
 
     //获取随机字符串
@@ -73,7 +84,7 @@ class Tools
     {
         $dtF = new DateTime("@0");
         $dtT = new DateTime("@$seconds");
-        return $dtF->diff($dtT)->format('%a 天, %h 小时, %i 分 and %s 秒');
+        return $dtF->diff($dtT)->format('%a 天, %h 小时, %i 分 + %s 秒');
     }
 
     public static function genSID()
@@ -99,24 +110,23 @@ class Tools
 	
 	public static function getAvPort()
     {
-		$retry=10;
-		$i=0;
-		while($i<$retry)
-		{
-			$port=(int)rand(Config::get('min_port'),Config::get('max_port'));
-			$user = User::where('port', $port)->first();
-			if ($user == null) {
-				return $port; 
-			}
-			else
-			{
-				$i++;
-			}
-			
-		}
-        
-        return (int)Rand(0,65535);
+		//检索User数据表现有port
+		$det = User::pluck('port')->toArray();
+
+		$port = array_diff(range(Config::get('min_port'),Config::get('max_port')),$det);
+		shuffle($port);
+
+		return $port[0];
     }
+	
+	
+	public function base64_url_encode($input) {
+		return strtr(base64_encode($input), '+/', '-_');
+	}
+
+	public function base64_url_decode($input) {
+		return base64_decode(strtr($input, '-_', '+/'));
+	}
 	
 	public static function getDir($dir) {
 		$dirArray[]=NULL;

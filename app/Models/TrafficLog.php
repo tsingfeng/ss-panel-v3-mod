@@ -12,17 +12,40 @@ class TrafficLog extends Model
 
     public function node()
     {
-        return Node::find($this->attributes['node_id']);
+		$node = Node::where("id",$this->attributes['node_id'])->first();
+		if($node == NULL)
+		{
+			TrafficLog::where('id','=',$this->attributes['id'])->delete();
+			return null;
+		}
+        else
+		{
+			return $node;
+		}
     }
 	
 	public function user()
     {
-        return User::find($this->attributes['user_id']);
+        $user = User::where("id",$this->attributes['user_id'])->first();
+		if($user == NULL)
+		{
+			TrafficLog::where('id','=',$this->attributes['id'])->delete();
+			return null;
+		}
+        else
+		{
+			return $user;
+		}
     }
 
     public function totalUsed()
     {
         return Tools::flowAutoShow($this->attributes['u'] + $this->attributes['d']);
+    }
+	
+	public function totalUsedRaw()
+    {
+        return number_format(($this->attributes['u'] + $this->attributes['d'])/1024,2,".","");
     }
 
     public function logTime()

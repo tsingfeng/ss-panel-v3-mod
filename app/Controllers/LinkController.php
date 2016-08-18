@@ -123,9 +123,13 @@ class LinkController extends BaseController
 		{
 			case -1:
 				$user=User::where("id",$Elink->userid)->first();
+				if($user == null)
+				{
+					return null;
+				}
 				$newResponse = $response->withHeader('Content-type', ' application/octet-stream')->withHeader('Content-Disposition', ' attachment; filename=allinone.conf');//->getBody()->write($builder->output());
-				$newResponse->getBody()->write(LinkController::GetIosConf(Node::where('sort', 0)->where("id","<>",Config::get('cloudxns_ping_nodeid'))->where("id","<>",Config::get('cloudxns_speed_nodeid'))->where(
-					function ($query) {
+				$newResponse->getBody()->write(LinkController::GetIosConf(Node::where('sort', 0)->where("type","1")->where(
+					function ($query) use ($user) {
 						$query->where("node_group","=",$user->node_group)
 							->orWhere("node_group","=",0);
 					}
@@ -172,10 +176,17 @@ class LinkController extends BaseController
         return $newResponse;
     }
 	
+	
+	public static function GetGfwlistJs($request, $response, $args){
+        $newResponse = $response->withHeader('Content-type', ' application/x-ns-proxy-autoconfig')->withHeader('Content-Disposition', ' attachment; filename=gfwlist.js');;//->getBody()->write($builder->output());
+        $newResponse->getBody()->write(LinkController::GetMacPac());
+        return $newResponse;
+	}
+	
 	public static function GetPcConf($nodes,$user){
 		$string='
 {
-	"index" : 4,
+	"index" : 0,
 	"random" : false,
 	"global" : false,
 	"enabled" : true,
@@ -204,27 +215,17 @@ class LinkController extends BaseController
 		$temparray=array();
 		foreach($nodes as $node)
 		{
-			if($node->id==Config::get('cloudxns_ping_nodeid')||$node->id==Config::get('cloudxns_speed_nodeid'))
-			{
-				if(Config::get('cloudxns_apikey')=="")
-				{
-					continue;
-				}
-				$smt=Smartline::where("node_class",$user->class)->where("type",($node->id==Config::get('cloudxns_ping_nodeid')?1:0))->first();
-				
-				$node->server=$smt->domain_prefix.".".Config::get("cloudxns_prefix").".".Config::get("cloudxns_domain");
-			}
 			array_push($temparray,array("remarks"=>$node->name,
 										"server"=>$node->server,
 										"server_port"=>$user->port,
 										"method"=>($node->custom_method==1?$user->method:$node->method),
-										"obfs"=>"plain",
-										"obfsparam"=>"",
+										"obfs"=>str_replace("_compatible","",((Config::get('enable_rss')=='true'&&$node->custom_rss==1&&!($user->obfs=='plain'&&$user->protocol=='origin'))?$user->obfs:"plain")),
+										"obfsparam"=>((Config::get('enable_rss')=='true'&&$node->custom_rss==1&&!($user->obfs=='plain'&&$user->protocol=='origin'))?$user->obfs_param:""),
 										"remarks_base64"=>base64_encode($node->name),
 										"password"=>$user->passwd,
 										"tcp_over_udp"=>false,
 										"udp_over_tcp"=>false,
-										"protocol"=>"origin",
+										"protocol"=>str_replace("_compatible","",((Config::get('enable_rss')=='true'&&$node->custom_rss==1&&!($user->obfs=='plain'&&$user->protocol=='origin'))?$user->protocol:"origin")),
 										"obfs_udp"=>false,
 										"enable"=>true));
 		}
@@ -238,16 +239,6 @@ class LinkController extends BaseController
 		$proxy_group="";
 		foreach($nodes as $node)
 		{
-			if($node->id==Config::get('cloudxns_ping_nodeid')||$node->id==Config::get('cloudxns_speed_nodeid'))
-			{
-				if(Config::get('cloudxns_apikey')=="")
-				{
-					continue;
-				}
-				$smt=Smartline::where("node_class",$user->class)->where("type",($node->id==Config::get('cloudxns_ping_nodeid')?1:0))->first();
-				
-				$node->server=$smt->domain_prefix.".".Config::get("cloudxns_prefix").".".Config::get("cloudxns_domain");
-			}
 			$proxy_group.=$node->name.' = custom,'.$node->server.','.$user->port.','.($node->custom_method==1?$user->method:$node->method).','.$user->passwd.','.Config::get('baseUrl').'/downloads/SSEncrypt.module'."\n";
 			$proxy_name.=",".$node->name;
 		}
@@ -1305,6 +1296,15 @@ FINAL,Proxy';
 
 	}
 	
+	private static function GetMacPac()
+	{
+		
+		header('Content-type: application/x-ns-proxy-autoconfig');
+		return LinkController::get_mac_pac();
+
+	}
+	
+	
 	
 	/** 
 	 * This is a php implementation of autoproxy2pac 
@@ -1371,7 +1371,49 @@ FINAL,Proxy';
 	}  
 	
 	
-	
+	private static function get_mac_pac() {  
+	  $rulelist = base64_decode(file_get_contents("https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt"));  
+	  $gfwlist = explode("\n", $rulelist);  
+	  $gfwlist[] = ".google.com";  
+	  
+	  $count = 0;  
+	  $pac_content = '';   
+	  $find_function_content = 'function FindProxyForURL(url, host) { var PROXY = "SOCKS5 127.0.0.1:1080; SOCKS 127.0.0.1:1080; DIRECT;"; var DEFAULT = "DIRECT";'."\n";  
+	  foreach($gfwlist as $index=>$rule) {  
+		if (empty($rule))  
+		  continue;  
+		else if (substr($rule, 0, 1) == '!' || substr($rule, 0, 1) == '[')  
+		  continue;  
+		$return_proxy = 'PROXY';  
+		// @@开头表示默认是直接访问  
+		if (substr($rule, 0, 2) == '@@') {  
+		  $rule = substr($rule, 2);  
+		  $return_proxy = "DEFAULT";  
+		}  
+	  
+		// ||开头表示前面还有路径  
+		if (substr($rule, 0, 2) =='||') {  
+		  $rule_reg = "^[\\w\\-]+:\\/+(?!\\/)(?:[^\\/]+\\.)?".LinkController::reg_encode(substr($rule, 2));  
+		// !开头相当于正则表达式^  
+		} else if (substr($rule, 0, 1) == '|') {  
+		  $rule_reg = "^" . LinkController::reg_encode(substr($rule, 1));  
+		// 前后匹配的/表示精确匹配  
+		} else if (substr($rule, 0, 1) == '/' && substr($rule, -1) == '/') {  
+		  $rule_reg = substr($rule, 1, strlen($rule) - 2);  
+		} else {  
+		  $rule_reg = LinkController::reg_encode($rule);  
+		}  
+		// 以|结尾，替换为$结尾  
+		if (preg_match("/\|$/i", $rule_reg)) {  
+		  $rule_reg = substr($rule_reg, 0, strlen($rule_reg) - 1)."$";  
+		}  
+		$find_function_content.='if (/' . $rule_reg . '/i.test(url)) return '.$return_proxy.';'."\n";  
+		$count = $count + 1;  
+	  }  
+	  $find_function_content.='return DEFAULT;'."}";  
+	  $pac_content.=$find_function_content;   
+	  return $pac_content;  
+	}  
 	
 
 

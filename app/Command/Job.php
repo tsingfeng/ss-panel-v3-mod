@@ -6,7 +6,6 @@ use App\Models\User;
 use App\Models\RadiusBan;
 use App\Models\LoginIp;
 use App\Models\Speedtest;
-use App\Models\Smartline;
 use App\Models\Shop;
 use App\Models\Bought;
 use App\Models\Coupon;
@@ -16,12 +15,15 @@ use App\Models\NodeOnlineLog;
 use App\Models\TrafficLog;
 use App\Services\Config;
 use App\Utils\Radius;
+use App\Utils\Wecenter;
 use App\Utils\Tools;
 use App\Services\Mail;
 use App\Utils\QQWry;
 use App\Utils\Duoshuo;
 use App\Utils\GA;
+use App\Utils\Telegram;
 use CloudXNS\Api;
+use App\Models\Disconnect;
 
 class Job
 {
@@ -36,6 +38,47 @@ class Job
 				$node->save();
 			}
 		}
+	}
+	
+	public static function backup()
+	{
+		mkdir('/tmp/ssmodbackup/');
+		
+		system('mysqldump --user='.Config::get('db_username').' --password='.Config::get('db_password').' --host='.Config::get('db_host').' '.Config::get('db_database').' announcement auto blockip bought code coupon disconnect_ip link login_ip payback radius_ban shop speedtest ss_invite_code ss_node ss_password_reset ticket unblockip user user_token email_verify> /tmp/ssmodbackup/mod.sql',$ret);
+		
+		
+		system('mysqldump --opt --user='.Config::get('db_username').' --password='.Config::get('db_password').' --host='.Config::get('db_host').' -d '.Config::get('db_database').' alive_ip ss_node_info ss_node_online_log user_traffic_log >> /tmp/ssmodbackup/mod.sql',$ret);
+		
+		if(Config::get('enable_radius')=='true')
+		{
+			system('mysqldump --user='.Config::get('radius_db_user').' --password='.Config::get('radius_db_password').' --host='.Config::get('radius_db_host').' '.Config::get('radius_db_database').'> /tmp/ssmodbackup/radius.sql',$ret);
+		}
+		
+		if(Config::get('enable_wecenter')=='true')
+		{
+			system('mysqldump --user='.Config::get('wecenter_db_user').' --password='.Config::get('wecenter_db_password').' --host='.Config::get('wecenter_db_host').' '.Config::get('wecenter_db_database').'> /tmp/ssmodbackup/wecenter.sql',$ret);
+		}
+	
+		system("cp ".Config::get('auto_backup_webroot')."/config/.config.php /tmp/ssmodbackup/",$ret);
+		system("zip -r /tmp/ssmodbackup.zip /tmp/ssmodbackup/* -P ".Config::get('auto_backup_passwd'),$ret);
+		
+		$subject = Config::get('appName')."-备份成功";
+		$to = Config::get('auto_backup_email');
+		$text = "您好，系统已经为您自动备份，请查看附件，用您设定的密码解压。" ;
+		try {
+			Mail::send($to, $subject, 'news/backup.tpl', [
+				"text" => $text
+			], ["/tmp/ssmodbackup.zip"
+			]);
+		} catch (Exception $e) {
+			echo $e->getMessage();
+		}
+		
+		system("rm -rf /tmp/ssmodbackup",$ret);
+		system("rm /tmp/ssmodbackup.zip",$ret);
+		
+		Telegram::Send("备份完毕了喵~今天又是安全祥和的一天呢。");
+		
 	}
 	
 	public static function SyncDuoshuo()
@@ -78,6 +121,9 @@ class Job
 	
 	public static function DailyJob()
     {
+		
+		
+		
 		$nodes = Node::all();
         foreach($nodes as $node){
 			if($node->sort==0)
@@ -97,6 +143,25 @@ class Job
 			NodeInfoLog::truncate();
 			NodeOnlineLog::truncate();
 			TrafficLog::truncate();
+			Telegram::Send("姐姐姐姐，数据库被清空，感觉身体被掏空了呢~");
+		}
+		
+		
+		$users = User::all();
+        foreach($users as $user){
+			
+			$user->last_day_t=($user->u+$user->d);
+			$user->save();
+				
+				
+			if(date("d") == $user->auto_reset_day)
+			{
+				$user->u = 0;
+				$user->d = 0;
+				$user->last_day_t = 0;
+				$user->transfer_enable = $user->auto_reset_bandwidth*1024*1024*1024;
+				$user->save();
+			}
 		}
 		
 		
@@ -114,34 +179,8 @@ class Job
 		{
 			file_put_contents(BASE_PATH."/storage/qqwry.md5",$newmd5);
 			$qqwry = file_get_contents("http://update.cz88.net/ip/qqwry.rar");
-			$key = unpack("V6", $copywrite)[6];
-			for($i=0; $i<0x200; $i++)
+			if($qqwry != "")
 			{
-				$key *= 0x805;
-				$key ++;
-				$key = $key & 0xFF;
-				$qqwry[$i] = chr( ord($qqwry[$i]) ^ $key );
-			}
-			$qqwry = gzuncompress($qqwry);
-			$fp = fopen(BASE_PATH."/app/Utils/qqwry.dat", "wb");
-			if($fp)
-			{
-				fwrite($fp, $qqwry);
-				fclose($fp);
-			}
-			
-			
-		}
-		
-		for($i=0;$i<5;$i++)
-		{
-			$iplocation = new QQWry(); 
-			$location=$iplocation->getlocation("8.8.8.8");
-			$Userlocation = $location['country'];
-			if(iconv('gbk', 'utf-8//IGNORE', $Userlocation)!="美国")
-			{
-				file_put_contents(BASE_PATH."/storage/qqwry.md5",$newmd5);
-				$qqwry = file_get_contents("http://update.cz88.net/ip/qqwry.rar");
 				$key = unpack("V6", $copywrite)[6];
 				for($i=0; $i<0x200; $i++)
 				{
@@ -151,21 +190,29 @@ class Job
 					$qqwry[$i] = chr( ord($qqwry[$i]) ^ $key );
 				}
 				$qqwry = gzuncompress($qqwry);
+				rename(BASE_PATH."/app/Utils/qqwry.dat",BASE_PATH."/app/Utils/qqwry.dat.bak");
 				$fp = fopen(BASE_PATH."/app/Utils/qqwry.dat", "wb");
 				if($fp)
 				{
 					fwrite($fp, $qqwry);
 					fclose($fp);
 				}
-		
-			}
-			else
-			{
-				break;
 			}
 		}
 		
+		$iplocation = new QQWry(); 
+		$location=$iplocation->getlocation("8.8.8.8");
+		$Userlocation = $location['country'];
+		if(iconv('gbk', 'utf-8//IGNORE', $Userlocation)!="美国")
+		{
+			unlink(BASE_PATH."/app/Utils/qqwry.dat");
+			rename(BASE_PATH."/app/Utils/qqwry.dat.bak",BASE_PATH."/app/Utils/qqwry.dat");
+		}
 		
+		if(Config::get('enable_auto_backup') == 'true')
+		{
+			Job::backup();
+		}
 		
 		
 		
@@ -173,19 +220,128 @@ class Job
 	
 	public static function CheckJob()
     {
+		//在线人数检测
+		$users = User::where('node_connector','>',0)->get();
+		
+		$full_alive_ips = Ip::where("datetime",">=",time()-60)->get();
+		
+		$alive_ipset = array();
+		
+		foreach($full_alive_ips as $full_alive_ip)
+		{
+			if(!isset($alive_ipset[$full_alive_ip->userid]))
+			{
+				$alive_ipset[$full_alive_ip->userid] = new \ArrayObject();
+			}
+			
+			$alive_ipset[$full_alive_ip->userid]->append($full_alive_ip);
+		}
+		
+		foreach($users as $user)
+		{
+			$alive_ips = (isset($alive_ipset[$user->id])?$alive_ipset[$user->id]:new \ArrayObject());
+			$ips = array();
+			
+			$disconnected_ips = explode(",",$user->disconnect_ip);
+			
+			foreach($alive_ips as $alive_ip)
+			{
+				if(!isset($ips[$alive_ip->ip]) && !in_array($alive_ip->ip,$disconnected_ips))
+				{
+					$ips[$alive_ip->ip]=1;
+					if($user->node_connector < count($ips))
+					{
+						//暂时封禁
+						$isDisconnect = Disconnect::where('id','=',$alive_ip->ip)->where('userid','=',$user->id)->first();
+						
+						if($isDisconnect == null)
+						{
+							$disconnect = new Disconnect();
+							$disconnect->userid = $user->id;
+							$disconnect->ip = $alive_ip->ip;
+							$disconnect->datetime = time();
+							$disconnect->save();
+							
+							if($user->disconnect_ip == NULL||$user->disconnect_ip == "")
+							{
+								$user->disconnect_ip = $alive_ip->ip;
+							}
+							else
+							{
+								$user->disconnect_ip .= ",".$alive_ip->ip;
+							}
+							$user->save();
+						}
+					}
+				}
+			}
+		}
+		
+		//解封
+		$disconnecteds = Disconnect::where("datetime","<",time()-300)->get();
+		foreach($disconnecteds as $disconnected)
+		{
+			$user = User::where('id','=',$disconnected->userid)->first();
+			
+			$ips = explode(",",$user->disconnect_ip);
+			$new_ips = "";
+			$first = 1;
+			
+			foreach($ips as $ip)
+			{
+				if($ip != $disconnected->ip && $ip != "")
+				{
+					if($first == 1)
+					{
+						$new_ips .= $ip;
+						$first = 0;
+					}
+					else
+					{
+						$new_ips .= ",".$ip;
+					}
+				}
+			}
+			
+			$user->disconnect_ip = $new_ips;
+			
+			if($new_ips == "")
+			{
+				$user->disconnect_ip = null;
+			}
+			
+			$user->save();
+			
+			$disconnected->delete();
+		}
+		
 		//auto renew
 		$boughts=Bought::where("renew","<",time())->where("renew","<>",0)->get();
 		foreach($boughts as $bought)
 		{
 			$user=User::where("id",$bought->userid)->first();
 			
+			if($user == NULL)
+			{
+				$bought->delete();
+				continue;
+			}
+			
 			if($user->money>=$bought->price)
 			{
+				$shop=Shop::where("id",$bought->shopid)->first();
+				
+				if($shop == NULL)
+				{
+					$bought->delete();
+					continue;
+				}
+				
 				$user->money=$user->money-$bought->price;
+				
 				$user->save();
 				
-				$shop::where("id",$bought->shopid);
-				$shop->buy($user);
+				$shop->buy($user,1);
 				
 				$bought->renew=time()+$shop->auto_renew*86400;
 				$bought->save();
@@ -202,14 +358,14 @@ class Job
 					echo $e->getMessage();
 				}
 				
-				if(file_exists(BASE_PATH."/storage/"+$bought->id+".renew", "w+"))
+				if(file_exists(BASE_PATH."/storage/".$bought->id.".renew"))
 				{
-					unlink(BASE_PATH."/storage/"+$bought->id+".renew");
+					unlink(BASE_PATH."/storage/".$bought->id.".renew");
 				}
 			}
 			else
 			{
-				if(!file_exists(BASE_PATH."/storage/"+$bought->id+".renew", "w+"))
+				if(!file_exists(BASE_PATH."/storage/".$bought->id.".renew"))
 				{
 					$subject = Config::get('appName')."-续费失败";
 					$to = $user->email;
@@ -222,7 +378,7 @@ class Job
 					} catch (Exception $e) {
 						echo $e->getMessage();
 					}
-					$myfile = fopen(BASE_PATH."/storage/"+$bought->id+".renew", "w+") or die("Unable to open file!");
+					$myfile = fopen(BASE_PATH."/storage/".$bought->id.".renew", "w+") or die("Unable to open file!");
 					$txt = "1";
 					fwrite($myfile, $txt);
 					fclose($myfile);
@@ -232,479 +388,49 @@ class Job
 		
 		
 		
-		
-		//DNS
-		
-		if(Config::get("cloudxns_apikey")!="")
-		{
-			$api=new Api();
-			$api->setApiKey(Config::get("cloudxns_apikey"));//修改成自己API KEY
-			$api->setSecretKey(Config::get("cloudxns_apisecret"));//修改成自己的SECERET KEY
-			
-			$api->setProtocol(true);
-			
-			$domain_json=json_decode($api->domain->domainList());
-			
-			foreach($domain_json->data as $domain)
-			{
-				if(strpos($domain->domain,Config::get('cloudxns_domain'))!==FALSE)
-				{
-					$domain_id=$domain->id;
-				}
-			}
-			
-			$Users=User::where("enable","=","1")->get();
-			
-			$Class_Array=array();
-			foreach($Users as $User)
-			{
-				$Class_Array[$User->class][$User->node_group]=1;
-			}
-			
-			
-			foreach($Class_Array as $Class => $value)
-			{
-				foreach($Class_Array[$Class] as $Group => $v)
-				{
-					$Telecom_node=0;
-					$Unicom_node=0;
-					$Cmcc_node=0;
-					
-					$Telecom_speed=0;
-					$Unicom_speed=0;
-					$Cmcc_speed=0;
-					
-					$Nodes=Node::where("node_class","<=",$Class)->where(
-						function ($query) {
-							$query->where("node_group","=",$Group)
-								->orWhere("node_group","=",0);
-						}
-					)->get();
-					foreach($Nodes as $Node)
-					{
-						$Speed=Speedtest::where("nodeid","=",$Node->id)->where("datetime",">",time()-Config::get('Speedtest_duration')*3600)->orderBy("datetime","desc")->take(1)->first();
-						if($Speed!=null)
-						{
-							$SpeedArray=explode(" ",$Speed->telecomeupload);
-							if($SpeedArray[0]!="null")
-							{
-								if($SpeedArray[0]>$Telecom_speed)
-								{
-									$Telecom_speed=$SpeedArray[0];
-									$Telecom_node=$Node->id;
-									
-								}
-							}
-							
-							$SpeedArray=explode(" ",$Speed->unicomupload);
-							if($SpeedArray[0]!="null")
-							{
-								if($SpeedArray[0]>$Unicom_speed)
-								{
-									$Unicom_speed=$SpeedArray[0];
-									$Unicom_node=$Node->id;
-								}
-							}
-							
-							$SpeedArray=explode(" ",$Speed->cmccupload);
-							if($SpeedArray[0]!="null")
-							{
-								if($SpeedArray[0]>$Cmcc_speed)
-								{
-									$Cmcc_speed=$SpeedArray[0];
-									$Cmcc_node=$Node->id;
-								}
-							}
-						}
-					}
-					
-					
-					$smt=Smartline::where('node_class',$Class)->where("node_group","=",$Group)->where("type",0)->first();
-					
-					if($smt==null)
-					{
-						$prefix=Tools::genRandomChar(8);
-					}
-					else
-					{
-						$prefix=$smt->domain_prefix;
-					}
-					
-					$Telecom_node=Node::where("id",$Telecom_node)->first();
-					if(Tools::is_ip($Telecom_node->server))
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Telecom_node->server, 'A', 55, 60, 1),TRUE);
-							$t_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->t_id!=$Telecom_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Telecom_node->server, 'A', 55, 60, 1,'',$smt->t_id);
-							}
-						}
-					}
-					else
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Telecom_node->server, 'CNAME', 55, 60, 1),TRUE);
-							$t_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->t_id!=$Telecom_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Telecom_node->server, 'CNAME', 55, 60, 1,'',$smt->t_id);
-							}
-						}
-					}
-					
-					
-					
-					$Unicom_node=Node::where("id",$Unicom_node)->first();
-					if(Tools::is_ip($Unicom_node->server))
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Unicom_node->server, 'A', 55, 60, 3),TRUE);
-							
-							$u_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->u_node!=$Unicom_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Unicom_node->server, 'A', 55, 60, 3,'',$smt->u_id);
-							}
-						}
-					}
-					else
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Unicom_node->server, 'CNAME', 55, 60, 3),TRUE);
-							$u_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->u_node!=$Unicom_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Unicom_node->server, 'CNAME', 55, 60, 3,'',$smt->u_id);
-							}
-						}
-					}
-					
-					$Cmcc_node=Node::where("id",$Cmcc_node)->first();
-					if(Tools::is_ip($Cmcc_node->server))
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Cmcc_node->server, 'A', 55, 60, 144),TRUE);
-							$c_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->c_node!=$Cmcc_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Cmcc_node->server, 'A', 55, 60, 144,'',$smt->c_id);
-							}
-						}
-					}
-					else
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Cmcc_node->server, 'CNAME', 55, 60, 144),TRUE);
-							$c_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->c_node!=$Cmcc_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Cmcc_node->server, 'CNAME', 55, 60, 144,'',$smt->c_id);
-							}
-						}
-					}
-					
-					
-					if($smt==null)
-					{
-						
-						$smt=new Smartline();
-						$smt->node_class=$Class;
-						$smt->node_group=$Group;
-						$smt->domain_prefix=$prefix;
-						$smt->type=0;
-						$smt->t_id=$t_id;
-						$smt->u_id=$u_id;
-						$smt->c_id=$c_id;
-						$smt->t_node=$Telecom_node->id;
-						$smt->u_node=$Unicom_node->id;
-						$smt->c_node=$Cmcc_node->id;
-						$smt->save();
-					}
-					else
-					{
-						
-						$prefix=$smt->domain_prefix;
-						$smt->t_node=$Telecom_node->id;
-						$smt->u_node=$Unicom_node->id;
-						$smt->c_node=$Cmcc_node->id;
-						$smt->save();
-					}
-					
-				
-				
-				}
-			}
-			
-			
-			
-			foreach($Class_Array as $Class => $Value)
-			{
-				foreach($Class_Array[$Class] as $Group => $v)
-				{
-					$Telecom_node=0;
-					$Unicom_node=0;
-					$Cmcc_node=0;
-					
-					$Telecom_ping=0;
-					$Unicom_ping=0;
-					$Cmcc_ping=0;
-					
-					$Nodes=Node::where("node_class","<=",$Class)->where(
-						function ($query) {
-							$query->where("node_group","=",$Group)
-								->orWhere("node_group","=",0);
-						}
-					)->get();
-					foreach($Nodes as $Node)
-					{
-						$Speed=Speedtest::where("nodeid","=",$Node->id)->where("datetime",">",time()-Config::get('Speedtest_duration')*3600)->orderBy("datetime","desc")->take(1)->first();
-						if($Speed!=null)
-						{
-							$SpeedArray=explode(" ",$Speed->telecomping);
-							if($SpeedArray[0]!="null")
-							{
-								if($SpeedArray[0]<$Telecom_ping||$Telecom_ping==0)
-								{
-									$Telecom_ping=$SpeedArray[0];
-									$Telecom_node=$Node->id;
-								}
-							}
-							
-							$SpeedArray=explode(" ",$Speed->unicomping);
-							if($SpeedArray[0]!="null")
-							{
-								if($SpeedArray[0]<$Unicom_ping||$Unicom_ping==0)
-								{
-									$Unicom_ping=$SpeedArray[0];
-									$Unicom_node=$Node->id;
-								}
-							}
-							
-							$SpeedArray=explode(" ",$Speed->cmccping);
-							if($SpeedArray[0]!="null")
-							{
-								if($SpeedArray[0]<$Cmcc_ping||$Cmcc_ping==0)
-								{
-									$Cmcc_ping=$SpeedArray[0];
-									$Cmcc_node=$Node->id;
-								}
-							}
-						}
-					}
-					
-					$smt=Smartline::where('node_class',$Class)->where("node_group","=",$Group)->where("type",1)->first();
-					if($smt==null)
-					{
-						$prefix=Tools::genRandomChar(8);
-					}
-					else
-					{
-						$prefix=$smt->domain_prefix;
-					}
-					
-					
-					
-					$Telecom_node=Node::where("id",$Telecom_node)->first();
-					if(Tools::is_ip($Telecom_node->server))
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Telecom_node->server, 'A', 55, 60, 1),TRUE);
-							
-							$t_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->t_id!=$Telecom_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Telecom_node->server, 'A', 55, 60, 1,'',$smt->t_id);
-							}
-						}
-					}
-					else
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Telecom_node->server, 'CNAME', 55, 60, 1),TRUE);
-							$t_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->t_id!=$Telecom_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Telecom_node->server, 'CNAME', 55, 60, 1,'',$smt->t_id);
-							}
-						}
-					}
-					
-					
-					
-					$Unicom_node=Node::where("id",$Unicom_node)->first();
-					if(Tools::is_ip($Unicom_node->server))
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Unicom_node->server, 'A', 55, 60, 3),TRUE);
-							$u_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->u_node!=$Unicom_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Unicom_node->server, 'A', 55, 60, 3,'',$smt->u_id);
-							}
-						}
-					}
-					else
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Unicom_node->server, 'CNAME', 55, 60, 3),TRUE);
-							$u_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->u_node!=$Unicom_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Unicom_node->server, 'CNAME', 55, 60, 3,'',$smt->u_id);
-							}
-						}
-					}
-					
-					$Cmcc_node=Node::where("id",$Cmcc_node)->first();
-					if(Tools::is_ip($Cmcc_node->server))
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Cmcc_node->server, 'A', 55, 60, 144),TRUE);
-							$c_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->c_node!=$Cmcc_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Cmcc_node->server, 'A', 55, 60, 144,'',$smt->c_id);
-							}
-						}
-					}
-					else
-					{
-						if($smt==null)
-						{
-							$result=json_decode($api->record->recordAdd($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Cmcc_node->server, 'CNAME', 55, 60, 144),TRUE);
-							$c_id=$result['record_id'][0];
-						}
-						else
-						{
-							if($smt->c_node!=$Cmcc_node->id)
-							{
-								$api->record->recordUpdate($domain_id, $prefix.'.'.Config::get('cloudxns_prefix'), $Cmcc_node->server, 'CNAME', 55, 60, 144,'',$smt->c_id);
-							}
-						}
-					}
-					
-					
-					if($smt==null)
-					{
-						$smt=new Smartline();
-						$smt->node_class=$Class;
-						$smt->node_group=$Group;
-						$smt->domain_prefix=$prefix;
-						$smt->type=1;
-						$smt->t_id=$t_id;
-						$smt->u_id=$u_id;
-						$smt->c_id=$c_id;
-						$smt->t_node=$Telecom_node->id;
-						$smt->u_node=$Unicom_node->id;
-						$smt->c_node=$Cmcc_node->id;
-						$smt->save();
-					}
-					else
-					{
-						$prefix=$smt->domain_prefix;
-						$smt->t_node=$Telecom_node->id;
-						$smt->u_node=$Unicom_node->id;
-						$smt->c_node=$Cmcc_node->id;
-						$smt->save();
-					}
-				
-				}
-			}
-			
-			$ping=Node::where("id",Config::get('cloudxns_ping_nodeid'))->first();
-			$ping->node_heartbeat=time();
-			$ping->save();
-			
-			$speed=Node::where("id",Config::get('cloudxns_speed_nodeid'))->first();
-			$speed->node_heartbeat=time();
-			$speed->save();
-			
-		}
-		
+
 		$adminUser = User::where("is_admin","=","1")->get();
 		
-		$newmd5 = md5(file_get_contents("https://github.com/glzjin/ss-panel-v3-mod/raw/master/bootstrap.php"));
+		$latest_content = file_get_contents("https://github.com/glzjin/ss-panel-v3-mod/raw/master/bootstrap.php");
+		$newmd5 = md5($latest_content);
 		$oldmd5 = md5(file_get_contents(BASE_PATH."/bootstrap.php"));
 		
-		if($newmd5 == $oldmd5)
+		if($latest_content!="")
 		{
-			if(file_exists(BASE_PATH."/storage/update.md5"))
+			if($newmd5 == $oldmd5)
 			{
-				unlink(BASE_PATH."/storage/update.md5");
-			}
-		}
-		else
-		{
-			if(!file_exists(BASE_PATH."/storage/update.md5"))
-			{
-				foreach($adminUser as $user)
+				if(file_exists(BASE_PATH."/storage/update.md5"))
 				{
-					echo "Send offline mail to user: ".$user->id;
-					$subject = Config::get('appName')."-系统提示";
-					$to = $user->email;
-					$text = "管理员您好，系统发现有了新版本，您可以到 <a href=\"https://github.com/glzjin/ss-panel-v3-mod/issues\">https://github.com/glzjin/ss-panel-v3-mod/issues</a> 按照步骤进行升级。" ;
-					try {
-						Mail::send($to, $subject, 'news/warn.tpl', [
-							"user" => $user,"text" => $text
-						], [
-						]);
-					} catch (Exception $e) {
-						echo $e->getMessage();
+					unlink(BASE_PATH."/storage/update.md5");
+				}
+			}
+			else
+			{
+				if(!file_exists(BASE_PATH."/storage/update.md5"))
+				{
+					foreach($adminUser as $user)
+					{
+						echo "Send mail to user: ".$user->id;
+						$subject = Config::get('appName')."-系统提示";
+						$to = $user->email;
+						$text = "管理员您好，系统发现有了新版本，您可以到 <a href=\"https://github.com/glzjin/ss-panel-v3-mod/issues\">https://github.com/glzjin/ss-panel-v3-mod/issues</a> 按照步骤进行升级。" ;
+						try {
+							Mail::send($to, $subject, 'news/warn.tpl', [
+								"user" => $user,"text" => $text
+							], [
+							]);
+						} catch (Exception $e) {
+							echo $e->getMessage();
+						}
+						
+						Telegram::Send("姐姐姐姐，面板程序有更新了呢~看看你的邮箱吧~");
 					}
 					
-					
+					$myfile = fopen(BASE_PATH."/storage/update.md5", "w+") or die("Unable to open file!");
+					$txt = "1";
+					fwrite($myfile, $txt);
+					fclose($myfile);
 				}
-				
-				$myfile = fopen(BASE_PATH."/storage/update.md5", "w+") or die("Unable to open file!");
-				$txt = "1";
-				fwrite($myfile, $txt);
-				fclose($myfile);
 			}
 		}
 
@@ -715,7 +441,7 @@ class Job
 			$nodes = Node::all();
 			
 			foreach($nodes as $node){
-				if(time()-$node->node_heartbeat>300&&time()-$node->node_heartbeat<360&&$node->node_heartbeat!=0&&($node->sort==0||$node->sort==7||$node->sort==8))
+				if(time()-$node->node_heartbeat>300&&time()-$node->node_heartbeat<=360&&$node->node_heartbeat!=0&&($node->sort==0||$node->sort==7||$node->sort==8))
 				{
 					foreach($adminUser as $user)
 					{
@@ -732,10 +458,57 @@ class Job
 							echo $e->getMessage();
 						}
 						
+						if(Config::get('enable_cloudxns')=='true'&&$node->sort==0)
+						{
+							$api=new Api();
+							$api->setApiKey(Config::get("cloudxns_apikey"));//修改成自己API KEY
+							$api->setSecretKey(Config::get("cloudxns_apisecret"));//修改成自己的SECERET KEY
+							
+							$api->setProtocol(true);
+							
+							$domain_json=json_decode($api->domain->domainList());
+							
+							foreach($domain_json->data as $domain)
+							{
+								if(strpos($domain->domain,Config::get('cloudxns_domain'))!==FALSE)
+								{
+									$domain_id=$domain->id;
+								}
+							}
+							
+							$record_json=json_decode($api->record->recordList($domain_id, 0, 0, 2000));
+							
+							foreach($record_json->data as $record)
+							{
+								if(($record->host.".".Config::get('cloudxns_domain'))==$node->server)
+								{
+									$record_id=$record->record_id;
+									
+									$Temp_node=Node::where('node_class','<=',$node->node_class)->where(
+										function ($query) use ($node) {
+											$query->where("node_group","=",$node->node_group)
+												->orWhere("node_group","=",0);
+										}
+									)->whereRaw('UNIX_TIMESTAMP()-`node_heartbeat`<300')->first();
+									
+									if($Temp_node!=null)
+									{								
+										$api->record->recordUpdate($domain_id, $record->host, $Temp_node->server, 'CNAME', 55, 60, 1, '', $record_id);
+									}
+								}
+							}
+							
+							Telegram::Send("喵喵喵~ ".$node->name." 节点掉线了喵~域名解析被切换到了 ".$Temp_node->name." 上了喵~");
+						}
+						else
+						{
+							Telegram::Send("喵喵喵~ ".$node->name." 节点掉线了喵~");
+						}
+						
 						
 					}
 					
-					$myfile = fopen(BASE_PATH."/storage/"+$node->id+".offline", "w+") or die("Unable to open file!");
+					$myfile = fopen(BASE_PATH."/storage/".$node->id.".offline", "w+") or die("Unable to open file!");
 					$txt = "1";
 					fwrite($myfile, $txt);
 					fclose($myfile);
@@ -744,7 +517,7 @@ class Job
 			
 			
 			foreach($nodes as $node){
-				if(time()-$node->node_heartbeat<60&&file_exists(BASE_PATH."/storage/"+$node->id+".offline")&&$node->node_heartbeat!=0&&($node->sort==0||$node->sort==7||$node->sort==8))
+				if(time()-$node->node_heartbeat<60&&file_exists(BASE_PATH."/storage/".$node->id.".offline")&&$node->node_heartbeat!=0&&($node->sort==0||$node->sort==7||$node->sort==8))
 				{
 					foreach($adminUser as $user)
 					{
@@ -762,9 +535,47 @@ class Job
 						}
 						
 						
+						if(Config::get('enable_cloudxns')=='true'&&$node->sort==0)
+						{
+							$api=new Api();
+							$api->setApiKey(Config::get("cloudxns_apikey"));//修改成自己API KEY
+							$api->setSecretKey(Config::get("cloudxns_apisecret"));//修改成自己的SECERET KEY
+							
+							$api->setProtocol(true);
+							
+							$domain_json=json_decode($api->domain->domainList());
+							
+							foreach($domain_json->data as $domain)
+							{
+								if(strpos($domain->domain,Config::get('cloudxns_domain'))!==FALSE)
+								{
+									$domain_id=$domain->id;
+								}
+							}
+							
+							$record_json=json_decode($api->record->recordList($domain_id, 0, 0, 2000));
+							
+							foreach($record_json->data as $record)
+							{
+								if(($record->host.".".Config::get('cloudxns_domain'))==$node->server)
+								{
+									$record_id=$record->record_id;
+									
+									$api->record->recordUpdate($domain_id, $record->host, $node->node_ip, 'A', 55, 600, 1, '', $record_id);
+								}
+							}
+							
+							
+							Telegram::Send("喵喵喵~ ".$node->name." 节点恢复了喵~域名解析被切换回来了喵~");
+						}
+						else
+						{
+							Telegram::Send("喵喵喵~ ".$node->name." 节点恢复了喵~");
+						}
+						
 					}
 					
-					unlink(BASE_PATH."/storage/"+$node->id+".offline");
+					unlink(BASE_PATH."/storage/".$node->id.".offline");
 				}
 			}
 		}
@@ -833,17 +644,161 @@ class Job
 				
 			}
 			
-			
-			if($user->class!=0&&strtotime($user->class_expire)>644447105&&strtotime($user->class_expire)<time())
+			if(strtotime($user->expire_in)<time()&&strtotime($user->expire_in)>=time()-60)
 			{
-				$user->class=0;
-				$user->save();
+				if(Config::get('enable_account_expire_reset')=='true')
+				{
+					$user->transfer_enable = Tools::toGB(Config::get('enable_account_expire_reset_traffic'));
+					$user->u = 0;
+					$user->d = 0;
+					$user->last_day_t = 0;
+					
+					$subject = Config::get('appName')."-您的用户账户已经过期了";
+					$to = $user->email;
+					$text = "您好，系统发现您的账号已经过期了。流量已经被重置为".Config::get('enable_account_expire_reset_traffic').'GB' ;
+					try {
+						Mail::send($to, $subject, 'news/warn.tpl', [
+							"user" => $user,"text" => $text
+						], [
+						]);
+					} catch (Exception $e) {
+						echo $e->getMessage();
+					}
+				}
 			}
+			
+			if(strtotime($user->expire_in)+((int)Config::get('enable_account_expire_delete_days')*86400)<time()&&strtotime($user->expire_in)+((int)Config::get('enable_account_expire_delete_days')*86400)>=time()-60)
+			{
+				if(Config::get('enable_account_expire_delete')=='true')
+				{
+					
+					$subject = Config::get('appName')."-您的用户账户已经被删除了";
+					$to = $user->email;
+					$text = "您好，系统发现您的账号已经过期 ".Config::get('enable_account_expire_delete_days')." 天了，帐号已经被删除。" ;
+					try {
+						Mail::send($to, $subject, 'news/warn.tpl', [
+							"user" => $user,"text" => $text
+						], [
+						]);
+					} catch (Exception $e) {
+						echo $e->getMessage();
+					}
+					
+					Radius::Delete($user->email);
+		
+					RadiusBan::where('userid','=',$user->id)->delete();
+					
+					Wecenter::Delete($user->email);
+					
+					$user->delete();
+					
+					
+					continue;
+				}
+			}
+			
+			
+			
+			if((int)Config::get('enable_auto_clean_uncheck_days')!=0 && $user->last_check_in_time+((int)Config::get('enable_auto_clean_uncheck_days')*86400)<time() && $user->last_check_in_time+((int)Config::get('enable_auto_clean_uncheck_days')*86400)>=time()-60 && $user->class == 0)
+			{
+				if(Config::get('enable_auto_clean_uncheck')=='true')
+				{
+					
+					$subject = Config::get('appName')."-您的用户账户已经被删除了";
+					$to = $user->email;
+					$text = "您好，系统发现您的账号已经 ".Config::get('enable_auto_clean_uncheck_days')." 天没签到了，帐号已经被删除。" ;
+					try {
+						Mail::send($to, $subject, 'news/warn.tpl', [
+							"user" => $user,"text" => $text
+						], [
+						]);
+					} catch (Exception $e) {
+						echo $e->getMessage();
+					}
+					
+					Radius::Delete($user->email);
+		
+					RadiusBan::where('userid','=',$user->id)->delete();
+					
+					Wecenter::Delete($user->email);
+					
+					$user->delete();
+					
+					
+					continue;
+				}
+			}
+			
+			
+			if((int)Config::get('enable_auto_clean_unused_days')!=0 && $user->t+((int)Config::get('enable_auto_clean_unused_days')*86400)<time() && $user->t+((int)Config::get('enable_auto_clean_unused_days')*86400)>=time()-60 && $user->class == 0)
+			{
+				if(Config::get('enable_auto_clean_unused')=='true')
+				{
+					
+					$subject = Config::get('appName')."-您的用户账户已经被删除了";
+					$to = $user->email;
+					$text = "您好，系统发现您的账号已经 ".Config::get('enable_auto_clean_unused_days')." 天没使用了，帐号已经被删除。" ;
+					try {
+						Mail::send($to, $subject, 'news/warn.tpl', [
+							"user" => $user,"text" => $text
+						], [
+						]);
+					} catch (Exception $e) {
+						echo $e->getMessage();
+					}
+					
+					Radius::Delete($user->email);
+		
+					RadiusBan::where('userid','=',$user->id)->delete();
+					
+					Wecenter::Delete($user->email);
+					
+					$user->delete();
+					
+					
+					continue;
+				}
+			}
+			
+			if($user->class!=0&&strtotime($user->class_expire)>=time()-60&&strtotime($user->class_expire)<time())
+			{
+				if(Config::get('enable_class_expire_reset')=='true')
+				{
+					$user->transfer_enable = Tools::toGB(Config::get('enable_class_expire_reset_traffic'));
+					$user->u = 0;
+					$user->d = 0;
+					$user->last_day_t = 0;
+					
+					$subject = Config::get('appName')."-您的用户等级已经过期了";
+					$to = $user->email;
+					$text = "您好，系统发现您的账号等级已经过期了。流量已经被重置为".Config::get('enable_class_expire_reset_traffic').'GB' ;
+					try {
+						Mail::send($to, $subject, 'news/warn.tpl', [
+							"user" => $user,"text" => $text
+						], [
+						]);
+					} catch (Exception $e) {
+						echo $e->getMessage();
+					}
+				}
+				
+				$user->class=0;
+				
+			}
+			
+			$user->save();
 		}
 		
 		$rbusers = RadiusBan::all();
 		foreach($rbusers as $sinuser){
 			$user=User::find($sinuser->userid);
+			
+			if($user == NULL)
+			{
+				$sinuser->delete();
+				continue;
+			}
+			
 			if($user->enable==1&&(strtotime($user->expire_in)>time()||strtotime($user->expire_in)<644447105)&&$user->transfer_enable>$user->u+$user->d)
 			{
 				$sinuser->delete();

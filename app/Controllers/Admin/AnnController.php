@@ -4,6 +4,7 @@ namespace App\Controllers\Admin;
 
 use App\Models\Ann;
 use App\Controllers\AdminController;
+use App\Utils\Telegram;
 
 class AnnController extends AdminController
 {
@@ -32,6 +33,9 @@ class AnnController extends AdminController
             $rs['msg'] = "添加失败";
             return $response->getBody()->write(json_encode($rs));
         }
+		
+		Telegram::SendMarkdown("新公告：".PHP_EOL.$request->getParam('markdown'));
+		
         $rs['ret'] = 1;
         $rs['msg'] = "公告添加成功";
         return $response->getBody()->write(json_encode($rs));
@@ -52,12 +56,16 @@ class AnnController extends AdminController
 
 		$ann->content =  $request->getParam('content');
 		$ann->markdown =  $request->getParam('markdown');
+		$ann->date =  date("Y-m-d H:i:s");
 		
         if(!$ann->save()){
             $rs['ret'] = 0;
             $rs['msg'] = "修改失败";
             return $response->getBody()->write(json_encode($rs));
         }
+		
+		Telegram::SendMarkdown("公告更新：".PHP_EOL.$request->getParam('markdown'));
+		
         $rs['ret'] = 1;
         $rs['msg'] = "修改成功";
         return $response->getBody()->write(json_encode($rs));

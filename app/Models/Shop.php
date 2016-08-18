@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Models;
-
+use App\Services\Config;
 
 class Shop extends Model
 
@@ -99,7 +99,7 @@ class Shop extends Model
 		}
     }
 	
-	public function buy($user)
+	public function buy($user, $is_renew = 0)
 	{
 		$content = json_decode($this->attributes['content'],TRUE);
         $content_text="";
@@ -109,7 +109,34 @@ class Shop extends Model
 			switch ($key)
 			{
 				case "bandwidth":
-					$user->transfer_enable=$user->transfer_enable+$value*1024*1024*1024;
+					if($is_renew == 0)
+					{
+						if(Config::get('enable_bought_reset') == 'true')
+						{
+							$user->transfer_enable=$value*1024*1024*1024;
+							$user->u = 0;
+							$user->d = 0;
+							$user->last_day_t = 0;
+						}
+						else
+						{
+							$user->transfer_enable=$user->transfer_enable+$value*1024*1024*1024;
+						}
+					}
+					else
+					{
+						if($this->attributes['auto_reset_bandwidth'] == 1)
+						{
+							$user->transfer_enable=$value*1024*1024*1024;
+							$user->u = 0;
+							$user->d = 0;
+							$user->last_day_t = 0;
+						}
+						else
+						{
+							$user->transfer_enable=$user->transfer_enable+$value*1024*1024*1024;
+						}
+					}
 					break;
 				case "expire":
 					if(time()>strtotime($user->expire_in))
@@ -122,10 +149,9 @@ class Shop extends Model
 					}
 					break;
 				case "class":
-					if($user->class==0)
+					if($user->class==0||$user->class!=$value)
 					{
 						$user->class_expire=date("Y-m-d H:i:s",time());
-						
 					}
 					$user->class_expire=date("Y-m-d H:i:s",strtotime($user->class_expire)+$content["class_expire"]*86400);
 					$user->class=$value;

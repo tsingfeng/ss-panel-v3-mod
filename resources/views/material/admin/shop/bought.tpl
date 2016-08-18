@@ -16,7 +16,7 @@
 			</div>
 		</div>
 		<div class="container">
-			<div class="col-lg-12 col-lg-push-0 col-sm-10 col-sm-push-1">
+			<div class="col-lg-12 col-sm-12">
 				<section class="content-inner margin-top-no">
 					
 					<div class="card">
@@ -39,37 +39,40 @@
 								<th>用户ID</th>
 								<th>用户名</th>
                                 <th>续费时间</th>
+								<th>续费时重置流量</th>
                                 
                             </tr>
                             {foreach $shops as $shop}
-                            <tr>
-								<td>
-                                    <a class="btn btn-brand" {if $shop->renew==0}disabled{/if} href="javascript:void(0);" onClick="delete_modal_show('{$shop->id}')">退订</a>
-                                </td>
-                                <td>#{$shop->id}</td>
-                                <td>{$shop->shop()->name}</td>
-								<td>{$shop->shop()->content()}</td>
-								<td>{$shop->price} 元</td>
-                                <td>{$shop->userid}</td>
-								<td>{$shop->user()->user_name}</td>
-								{if $shop->renew==0}
-                                <td>不自动续费</td>
-								{else}
-								<td>在 {$shop->renew_date()} 续费</td>
+								{if $shop->user()!=NULL}
+									<tr>
+										<td>
+											<a class="btn btn-brand" {if $shop->renew==0}disabled{else} href="javascript:void(0);" onClick="delete_modal_show('{$shop->id}')"{/if}>退订</a>
+										</td>
+										<td>#{$shop->id}</td>
+										<td>{$shop->shop()->name}</td>
+										<td>{$shop->shop()->content()}</td>
+										<td>{$shop->price} 元</td>
+										<td>{$shop->userid}</td>
+										<td>{$shop->user()->user_name}</td>
+										{if $shop->renew==0}
+										<td>不自动续费</td>
+										{else}
+										<td>在 {$shop->renew_date()} 续费</td>
+										{/if}
+										
+										{if $shop->shop()->auto_reset_bandwidth==0}
+										<td>不自动重置</td>
+										{else}
+										<td>自动重置</td>
+										{/if}
+										
+									</tr>
 								{/if}
-                                
-                            </tr>
                             {/foreach}
                         </table>
 						{$shops->render()}
 					</div>
 					
-					<div class="fbtn-container">
-						<div class="fbtn-inner">
-							<a class="fbtn fbtn-lg fbtn-brand-accent waves-attach waves-circle waves-light" href="/admin/shop/create">+</a>
-							
-						</div>
-					</div>
 					
 					<div aria-hidden="true" class="modal fade" id="delete_modal" role="dialog" tabindex="-1">
 						<div class="modal-dialog">
@@ -126,8 +129,8 @@ $(document).ready(function(){
 			success:function(data){
 				if(data.ret){
 					$("#result").modal();
-					$("#msg").html(data.msg+"  五秒后跳转。");
-					window.setTimeout("location.href=window.location.href", 5000);
+					$("#msg").html(data.msg);
+					window.setTimeout("location.href=window.location.href", {$config['jump_delay']});
 				}else{
 					$("#result").modal();
 					$("#msg").html(data.msg);

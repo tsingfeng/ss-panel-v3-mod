@@ -7,8 +7,13 @@ class Config
 {
 	
     public static function get($key){
-		require BASE_PATH."/config/.config.php";
+		global $System_Config;
 		return $System_Config[$key];
+    }
+	
+	public static function set($key,$value){
+		global $System_Config;
+		$System_Config[$key] = $value;
     }
 
     public static function getPublicConfig(){
@@ -20,7 +25,12 @@ class Config
             "checkinMin" => self::get("checkinMin"),
 			"code_payback" => self::get("code_payback"),
             "checkinMax" => self::get("checkinMax"),
-			"wecenter_url" => self::get("wecenter_url")
+			"wecenter_url" => self::get("wecenter_url"),
+			"enable_wecenter" => self::get("enable_wecenter"),
+			"enable_rss" => self::get("enable_rss"),
+			"jump_delay" => self::get("jump_delay"),
+			"enable_analytics_code" => self::get("enable_analytics_code"),
+			"enable_donate" => self::get("enable_donate")
          ];
     }
 
