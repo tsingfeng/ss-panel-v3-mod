@@ -16,6 +16,9 @@ $System_Config['sessionDriver'] = 'cookie';
 $System_Config['cacheDriver'] = 'cookie';
 $System_Config['tokenDriver'] = 'db';
 
+// 如果你配置了CDN或反向代理，开启此选项可以获得访问者真实IP(如果可用)。如未配置CDN或反向代理请不要开启，以免访问者伪造IP地址。
+$System_Config['enable_forward_detect'] = 'false';
+
 //$System_Config['version'] = '<a href="https://www.zhaoj.in">Glzjin</a> mod-2016042210000';
 
 // mu key 用于校验ss-go mu的请求,半角逗号分隔
