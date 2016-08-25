@@ -194,6 +194,8 @@ $System_Config['email_verify_ttl']='3600';
 #单IP可请求验证码次数（上面那个周期内）
 $System_Config['email_verify_iplimit']='10';
 
+#阻止符合正则表达式的邮箱 如'/.*@qq\.com/'会阻止所有@qq.com结尾的邮箱
+$System_Config['email_verify_regex']='';
 
 #注册时默认加密方式
 $System_Config['reg_method']='rc4-md5';

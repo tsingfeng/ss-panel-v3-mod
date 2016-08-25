@@ -167,6 +167,11 @@ class AuthController extends BaseController
 				return $response->getBody()->write(json_encode($res));
 			}
 			
+			if(!Check::isEmailLegalRegex($email)){
+				$res['ret'] = 0;
+				$res['msg'] = "此邮箱被阻止";
+				return $response->getBody()->write(json_encode($res));
+			}
 			
 			$user = User::where('email','=',$email)->first();
 			if($user!=null)
