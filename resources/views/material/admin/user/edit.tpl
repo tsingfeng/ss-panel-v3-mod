@@ -1,5 +1,3 @@
-
-
 {include file='admin/main.tpl'}
 
 
@@ -48,6 +46,14 @@
 									<div class="checkbox switch">
 										<label for="enable">
 											<input {if $user->enable==1}checked{/if} class="access-hide" id="enable" type="checkbox"><span class="switch-toggle"></span>用户启用
+										</label>
+									</div>
+								</div>
+								
+								<div class="form-group form-group-label">
+									<div class="checkbox switch">
+										<label for="is_multi_user">
+											<input {if $user->is_multi_user==1}checked{/if} class="access-hide" id="is_multi_user" type="checkbox"><span class="switch-toggle"></span>单端口多用户承载端口
 										</label>
 									</div>
 								</div>
@@ -272,6 +278,15 @@
 			{
 				var enable=0;
 			}
+			
+			if(document.getElementById('is_multi_user').checked)
+			{
+				var is_multi_user=1;
+			}
+			else
+			{
+				var is_multi_user=0;
+			}
             $.ajax({
                 type: "PUT",
                 url: "/admin/user/{$user->id}",
@@ -281,6 +296,7 @@
                     pass: $("#pass").val(),
 					auto_reset_day: $("#auto_reset_day").val(),
                     auto_reset_bandwidth: $("#auto_reset_bandwidth").val(),
+                    is_multi_user: is_multi_user,
                     port: $("#port").val(),
 					group: $("#group").val(),
                     passwd: $("#passwd").val(),
