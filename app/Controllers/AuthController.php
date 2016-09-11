@@ -21,7 +21,7 @@ use App\Utils\Duoshuo;
 use App\Utils\GA;
 use App\Utils\Wecenter;
 use App\Utils\Geetest;
-
+use App\Utils\Http;
 
 
 /**
@@ -79,7 +79,7 @@ class AuthController extends BaseController
 			
 			
 			$loginip=new LoginIp();
-			$loginip->ip=$_SERVER["REMOTE_ADDR"];
+			$loginip->ip=Http::getClientIP();
 			$loginip->userid=$user->id;
 			$loginip->datetime=time();
 			$loginip->type=1;
@@ -110,7 +110,7 @@ class AuthController extends BaseController
         $rs['msg'] = "欢迎回来";
 		
 		$loginip=new LoginIp();
-		$loginip->ip=$_SERVER["REMOTE_ADDR"];
+		$loginip->ip=Http::getClientIP();
 		$loginip->userid=$user->id;
 		$loginip->datetime=time();
 		$loginip->type=0;
@@ -167,6 +167,11 @@ class AuthController extends BaseController
 				return $response->getBody()->write(json_encode($res));
 			}
 			
+			if(!Check::isEmailLegalRegex($email)){
+				$res['ret'] = 0;
+				$res['msg'] = "此邮箱被阻止";
+				return $response->getBody()->write(json_encode($res));
+			}
 			
 			$user = User::where('email','=',$email)->first();
 			if($user!=null)
@@ -176,7 +181,7 @@ class AuthController extends BaseController
 				return $response->getBody()->write(json_encode($res));
 			}
 			
-			$ipcount = EmailVerify::where('ip','=',$_SERVER["REMOTE_ADDR"])->where('expire_in','>',time())->count();
+			$ipcount = EmailVerify::where('ip','=',Http::getClientIP())->where('expire_in','>',time())->count();
 			if($ipcount>=(int)Config::get('email_verify_iplimit'))
 			{
 				$res['ret'] = 0;
@@ -197,7 +202,7 @@ class AuthController extends BaseController
 			
 			$ev = new EmailVerify();
 			$ev->expire_in = time() + Config::get('email_verify_ttl');
-			$ev->ip = $_SERVER["REMOTE_ADDR"];
+			$ev->ip = Http::getClientIP();
 			$ev->email = $email;
 			$ev->code = $code;
 			$ev->save();
@@ -345,7 +350,7 @@ class AuthController extends BaseController
 		}
 		$user->expire_in=date("Y-m-d H:i:s",time()+Config::get('user_expire_in_default')*86400);
 		$user->reg_date=date("Y-m-d H:i:s");
-		$user->reg_ip=$_SERVER["REMOTE_ADDR"];
+		$user->reg_ip=Http::getClientIP();
 		$user->money=0;
 		$user->class=0;
 		$user->plan='A';

@@ -16,6 +16,9 @@ $System_Config['sessionDriver'] = 'cookie';
 $System_Config['cacheDriver'] = 'cookie';
 $System_Config['tokenDriver'] = 'db';
 
+// 如果你配置了CDN或反向代理，开启此选项可以获得访问者真实IP(如果可用)。如未配置CDN或反向代理请不要开启，以免访问者伪造IP地址。
+$System_Config['enable_forward_detect'] = 'false';
+
 //$System_Config['version'] = '<a href="https://www.zhaoj.in">Glzjin</a> mod-2016042210000';
 
 // mu key 用于校验ss-go mu的请求,半角逗号分隔
@@ -191,6 +194,8 @@ $System_Config['email_verify_ttl']='3600';
 #单IP可请求验证码次数（上面那个周期内）
 $System_Config['email_verify_iplimit']='10';
 
+#阻止符合正则表达式的邮箱 如'/.*@qq\.com/'会阻止所有@qq.com结尾的邮箱
+$System_Config['email_verify_regex']='';
 
 #注册时默认加密方式
 $System_Config['reg_method']='rc4-md5';
